@@ -1,27 +1,27 @@
-from warnings import filterwarnings
-filterwarnings('ignore')
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
-# Create the FastAPI application instance.
+from app.api.routes import router
+from app.core.config import APP_NAME, APP_VERSION, FRONTEND_ORIGIN
+
+# Create the application using centralized settings.
 app = FastAPI(
-    title="Customer Support AI Assistant",
+    title=APP_NAME,
     description="Backend API for our multi-agent GenAI project",
-    version="0.1.0",
+    version=APP_VERSION,
 )
 
+# Allow the local React development server to call the API.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        FRONTEND_ORIGIN,
+        "http://127.0.0.1:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# Health-check endpoint to verify that the backend is running.
-@app.get("/health")
-def health_check():
-    return {
-        "status": "healthy",
-        "message": "Customer Support AI backend is running!"
-    }
-
-
-# Root endpoint to provide basic API information.
-@app.get("/")
-def root():
-    return {
-        "message": "Welcome to the Customer Support AI Assistant API"
-    }
+# Register the API endpoints.
+app.include_router(router)
