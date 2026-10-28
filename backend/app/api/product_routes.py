@@ -7,29 +7,33 @@ from app.database import get_db
 from app.models import Product
 from app.schemas.product import ProductCreate, ProductResponse
 
+from decimal import Decimal
+
+from app.services.product_service import search_products
+
 router = APIRouter(prefix="/api/products", tags=["Products"])
+
 
 
 @router.get("", response_model=list[ProductResponse])
 def list_products(
+    query: str | None = None,
     category: str | None = None,
-    max_price: float | None = Query(default=None, gt=0),
+    max_price: Decimal | None = Query(default=None, gt=0),
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
-    """List active products with optional category and price filters."""
-    statement = select(Product).where(Product.active.is_(True))
+    """Search active products through the reusable service layer."""
+    return search_products(
+        db=db,
+        query=query,
+        category=category,
+        max_price=max_price,
+        limit=limit,
+        offset=offset,
+    )
 
-    if category:
-        statement = statement.where(Product.category == category)
-
-    if max_price is not None:
-        statement = statement.where(Product.price <= max_price)
-
-    statement = statement.order_by(Product.id).offset(offset).limit(limit)
-
-    return db.scalars(statement).all()
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
