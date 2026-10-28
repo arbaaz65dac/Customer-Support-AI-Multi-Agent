@@ -18,3 +18,33 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     # Plain-text answer returned by the LLM service.
     answer: str
+
+
+
+from typing import Literal
+from pydantic import BaseModel, Field
+
+class ChatAssistantResponse(BaseModel):
+    """A predictable response format for the support assistant."""
+
+    # The category of the user's request.
+    intent: Literal[
+        "general_question",
+        "product_search",
+        "order_status",
+        "create_ticket",
+        "policy_question",
+        "unknown",
+    ]
+
+    # The natural-language response shown to the user.
+    answer: str = Field(min_length=1, max_length=2000)
+
+    # A suggested application action, not an executed action.
+    suggested_action: Literal[
+        "search_products",
+        "check_order",
+        "create_support_ticket",
+        "retrieve_policy",
+        "none",
+    ]
