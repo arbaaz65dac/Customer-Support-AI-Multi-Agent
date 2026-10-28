@@ -24,11 +24,28 @@ def create_support_tools(db: Session):
     ) -> str:
         """
         Search active products by name or description.
-
-        Use this when a user asks to find or compare products.
         Optionally restrict results to a maximum price.
-        Do not use this tool to create or modify products.
         """
+        # Reject empty or excessively long searches.
+        query = query.strip()
+        if not query:
+            return json.dumps({
+                "error": "Search query cannot be empty."
+            })
+
+        if len(query) > 100:
+            return json.dumps({
+                "error": "Search query must be 100 characters or fewer."
+            })
+
+        # Reject nonsensical price limits before querying the database.
+        if max_price is not None and (
+            max_price <= 0 or max_price > 1_000_000
+        ):
+            return json.dumps({
+                "error": "Maximum price must be between 0 and 1000000."
+            })
+
         products = search_products(
             db=db,
             query=query,
@@ -41,7 +58,6 @@ def create_support_tools(db: Session):
             offset=0,
         )
 
-        # Return a small, predictable payload instead of ORM objects.
         results = [
             {
                 "id": product.id,
@@ -54,7 +70,10 @@ def create_support_tools(db: Session):
             for product in products
         ]
 
-        return json.dumps(results)
+        return json.dumps({
+            "count": len(results),
+            "products": results,
+        })
 
     @tool
     def lookup_order_status(
@@ -68,6 +87,10 @@ def create_support_tools(db: Session):
         Both identifiers are required for this development tool.
         Never invent order details if no matching order exists.
         """
+        if order_id <= 0 or customer_id <= 0:
+            return json.dumps({
+                "error": "Order ID and customer ID must be positive integers."
+            })
         statement = (
             select(Order)
             .options(selectinload(Order.items))

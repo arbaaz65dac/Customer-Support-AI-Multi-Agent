@@ -50,21 +50,28 @@ def answer_with_tools(message: str, db: Session) -> str:
 
     # Limit tool-calling rounds to prevent an endless loop.
     max_rounds = 3
+    max_total_tool_calls = 4
+    total_tool_calls = 0
 
     for _ in range(max_rounds):
-        # Ask the model for either a final answer or tool calls.
         ai_message = llm_with_tools.invoke(messages)
         messages.append(ai_message)
 
-        # No tool call means the model has produced its final response.
+        # No tool call means the model has produced its final answer.
         if not ai_message.tool_calls:
             if isinstance(ai_message.content, str) and ai_message.content.strip():
                 return ai_message.content.strip()
 
             raise RuntimeError("The model returned an empty response")
 
-        # Execute only the tool names explicitly registered above.
         for tool_call in ai_message.tool_calls:
+            # Enforce the total budget, even if one response requests
+            # several tools at once.
+            if total_tool_calls >= max_total_tool_calls:
+                raise RuntimeError("The assistant exceeded its tool-call limit")
+
+            total_tool_calls += 1
+
             tool_name = tool_call["name"]
             tool_args = tool_call["args"]
             tool_call_id = tool_call["id"]
@@ -72,18 +79,18 @@ def answer_with_tools(message: str, db: Session) -> str:
             selected_tool = tools_by_name.get(tool_name)
 
             if selected_tool is None:
-                # Never execute an unregistered tool.
                 tool_result = "Error: requested tool is not permitted."
             else:
                 try:
                     tool_result = selected_tool.invoke(tool_args)
-                except Exception:
-                    # Don't expose database or internal errors to the model.
+                except Exception as exc:
+                    # Log only the exception type. Do not expose internal
+                    # database errors or credentials to the model.
+                    print(f"Tool execution failed: {type(exc).__name__}")
                     tool_result = (
                         "Error: the requested lookup could not be completed."
                     )
 
-            # Send the result back in the format expected by LangChain.
             messages.append(
                 ToolMessage(
                     content=str(tool_result),
@@ -91,4 +98,4 @@ def answer_with_tools(message: str, db: Session) -> str:
                 )
             )
 
-    raise RuntimeError("The assistant exceeded the tool-calling limit")
+    raise RuntimeError("The assistant exceeded the tool-calling round limit")

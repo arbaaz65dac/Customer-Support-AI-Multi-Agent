@@ -15,7 +15,7 @@ from app import models  # noqa: F401
 
 @pytest.fixture()
 def client():
-    # Keep an in-memory SQLite database alive for this test.
+    # Create an in-memory SQLite database for this test.
     test_engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -26,11 +26,12 @@ def client():
         bind=test_engine,
         autoflush=False,
         expire_on_commit=False,
+        autocommit=False,
     )
 
     Base.metadata.create_all(bind=test_engine)
 
-    # Override the application's MySQL session with a test session.
+    # Override the application's database dependency.
     def override_get_db():
         db = TestSessionLocal()
         try:
@@ -46,3 +47,31 @@ def client():
     app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=test_engine)
     test_engine.dispose()
+
+
+@pytest.fixture()
+def db_session():
+    # Create an isolated in-memory SQLite database for direct tool tests.
+    test_engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    TestSessionLocal = sessionmaker(
+        bind=test_engine,
+        autoflush=False,
+        expire_on_commit=False,
+        autocommit=False,
+    )
+
+    Base.metadata.create_all(bind=test_engine)
+
+    session = TestSessionLocal()
+
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=test_engine)
+        test_engine.dispose()
