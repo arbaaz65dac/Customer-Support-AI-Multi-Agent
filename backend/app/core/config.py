@@ -23,3 +23,9 @@ GROQ_MODEL = os.getenv(
     "GROQ_MODEL",
     "llama-3.3-70b-versatile",
 )
+
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+GEMINI_EMBEDDING_MODEL = os.getenv(
+    "GEMINI_EMBEDDING_MODEL",
+    "gemini-embedding-001",
+)
