@@ -1,10 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.product_routes import router as product_router
-from app.api.customer_routes import router as customer_router
 
 from app.api.routes import router
 from app.core.config import APP_NAME, APP_VERSION, FRONTEND_ORIGIN
+
+from app.api.product_routes import router as product_router
+from app.api.customer_routes import router as customer_router
+from app.api.order_routes import router as order_router
+from app.api.support_ticket_routes import (
+    router as support_ticket_router,
+)
 
 # Create the application using centralized settings.
 app = FastAPI(
@@ -29,3 +34,5 @@ app.add_middleware(
 app.include_router(router)
 app.include_router(product_router)
 app.include_router(customer_router)
+app.include_router(order_router)
+app.include_router(support_ticket_router)
