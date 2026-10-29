@@ -45,15 +45,23 @@ def test_product_question_routes_to_product_order_agent():
     assert "database session is required" in result["answer"].lower()
 
 
+
 def test_product_agent_uses_existing_tool_service(monkeypatch):
-    """Verify the graph passes the question and DB session to the service."""
+    """Verify the graph forwards the DB and trusted customer ID."""
 
     fake_db = object()
+    trusted_customer_id = 123
     expected_question = "Find products under 2000"
 
-    def fake_answer_with_tools(message, db):
+    def fake_answer_with_tools(
+        message,
+        db,
+        trusted_customer_id=None,
+    ):
         assert message == expected_question
         assert db is fake_db
+        assert trusted_customer_id == 123
+
         return "I found two matching products."
 
     monkeypatch.setattr(
@@ -63,7 +71,10 @@ def test_product_agent_uses_existing_tool_service(monkeypatch):
 
     result = support_graph.invoke(
         {"question": expected_question},
-        context={"db": fake_db},
+        context={
+            "db": fake_db,
+            "customer_id": trusted_customer_id,
+        },
     )
 
     assert result["intent"] == "product_search"

@@ -36,3 +36,11 @@ RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
 RAG_MAX_DISTANCE = float(
     os.getenv("RAG_MAX_DISTANCE", "1.5")
 )
+
+# Authentication settings.
+# Set a long, random secret in backend/.env before running the app.
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "")
+JWT_ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30")
+)

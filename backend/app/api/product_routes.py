@@ -10,6 +10,7 @@ from app.schemas.product import ProductCreate, ProductResponse
 from decimal import Decimal
 
 from app.services.product_service import search_products
+from app.core.security import require_admin
 
 router = APIRouter(prefix="/api/products", tags=["Products"])
 
@@ -58,6 +59,7 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
 def create_product(
     product_data: ProductCreate,
     db: Session = Depends(get_db),
+    admin_customer=Depends(require_admin),
 ):
     """Create a product. Restrict this endpoint to admins before production."""
     product = Product(**product_data.model_dump())

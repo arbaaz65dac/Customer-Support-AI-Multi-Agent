@@ -1,5 +1,5 @@
 
-from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from sqlalchemy.orm import Session
 
@@ -7,26 +7,28 @@ from app.core.config import GROQ_API_KEY, GROQ_MODEL
 from app.services.agent_tools import create_support_tools
 
 
-def answer_with_tools(message: str, db: Session) -> str:
+def answer_with_tools(
+    message: str,
+    db: Session,
+    trusted_customer_id: int | None = None,
+) -> str:
     """
     Answer a customer question using approved support tools.
 
-    Workflow:
-    1. Ask the model which tool, if any, should be called.
-    2. Execute the requested tool using the database session.
-    3. Give the tool results to a fresh, text-only model request.
-    4. Return the final customer-facing answer.
+    trusted_customer_id must come from trusted application context,
+    never from the LLM or free-form customer input.
     """
 
-    # Ensure the Groq API key is configured.
     if not GROQ_API_KEY:
         raise RuntimeError("GROQ_API_KEY is not configured")
 
-    # Create the tools with access to the current database session.
-    tools = create_support_tools(db)
-    tools_by_name = {tool.name: tool for tool in tools}
+    # Create tools with the trusted customer identity, if available.
+    tools = create_support_tools(
+        db=db,
+        trusted_customer_id=trusted_customer_id,
+    )
+    tools_by_name = {support_tool.name: support_tool for support_tool in tools}
 
-    # Model used for both tool selection and final answer generation.
     llm = ChatGroq(
         model=GROQ_MODEL,
         temperature=0,
@@ -36,10 +38,8 @@ def answer_with_tools(message: str, db: Session) -> str:
         max_retries=1,
     )
 
-    # Bind the approved tools to the model for the first request.
     llm_with_tools = llm.bind_tools(tools)
 
-    # Keep the tool-selection prompt focused on permitted actions.
     system_prompt = """
 You are a customer support assistant.
 
@@ -48,8 +48,11 @@ or order-related information that requires a lookup.
 
 Rules:
 - Call only tools that are available to you.
-- Provide tool arguments that match the tool's schema.
-- Do not invent products, prices, stock, or order information.
+- Provide arguments matching the tool schema.
+- Never invent products, prices, stock, or order information.
+- Never ask a tool to look up a different customer's identity.
+- If an order lookup requires authentication and no trusted customer
+  identity is available, explain that the customer must authenticate.
 - If a tool returns no matching results, report that clearly.
 """
 
@@ -58,23 +61,20 @@ Rules:
         HumanMessage(content=message),
     ]
 
-    # Limit tool calls to prevent repeated calls or endless loops.
     max_total_tool_calls = 4
     total_tool_calls = 0
     tool_results = []
 
-    # Request tool selection once. The model may request multiple tools
-    # in the same response, subject to the overall tool-call limit.
+    # Ask the model whether a support tool is required.
     ai_message = llm_with_tools.invoke(messages)
 
     if not ai_message.tool_calls:
-        # The model answered directly without requesting a tool.
         if isinstance(ai_message.content, str) and ai_message.content.strip():
             return ai_message.content.strip()
 
         raise RuntimeError("The model returned an empty response")
 
-    # Execute each requested tool.
+    # Execute only the tools registered by the application.
     for tool_call in ai_message.tool_calls:
         if total_tool_calls >= max_total_tool_calls:
             break
@@ -83,23 +83,20 @@ Rules:
 
         tool_name = tool_call["name"]
         tool_args = tool_call["args"]
-
         selected_tool = tools_by_name.get(tool_name)
 
         if selected_tool is None:
-            # Never execute tools that are not explicitly approved.
             tool_result = "Error: requested tool is not permitted."
         else:
             try:
                 tool_result = selected_tool.invoke(tool_args)
             except Exception as exc:
-                # Avoid returning internal exception details to the customer.
+                # Log the exception type without exposing internal details.
                 print(f"Tool execution failed: {type(exc).__name__}")
                 tool_result = (
                     "Error: the requested lookup could not be completed."
                 )
 
-        # Save results as plain text for final answer generation.
         tool_results.append(
             f"Tool name: {tool_name}\n"
             f"Tool result: {tool_result}"
@@ -108,19 +105,15 @@ Rules:
     if not tool_results:
         raise RuntimeError("No tool results were produced")
 
-    # IMPORTANT:
-    # Use a fresh conversation without the original AI tool-call message
-    # or ToolMessage objects. This prevents the final request from
-    # accidentally continuing the earlier tool-calling sequence.
+    # Use a fresh, text-only conversation for the final response.
     final_messages = [
         SystemMessage(
             content=(
-                "You are a customer support assistant. "
-                "Answer the customer's question using only the supplied "
-                "tool results. Do not call tools, invent facts, or claim "
-                "that an action succeeded unless the results confirm it. "
-                "If the results contain an error or no matching records, "
-                "explain that clearly and politely. Keep the answer concise."
+                "You are a customer support assistant. Answer using only "
+                "the supplied tool results. Do not invent facts or claim "
+                "an action succeeded unless the results confirm it. If a "
+                "lookup fails or requires authentication, explain that "
+                "clearly and politely. Keep the answer concise."
             )
         ),
         HumanMessage(
@@ -134,12 +127,10 @@ Rules:
         ),
     ]
 
-    # Call the unbound model with plain-text messages only.
     final_response = llm.invoke(final_messages)
 
     if isinstance(final_response.content, str):
         answer = final_response.content.strip()
-
         if answer:
             return answer
 

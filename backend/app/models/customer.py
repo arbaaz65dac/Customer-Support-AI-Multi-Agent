@@ -11,11 +11,32 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    email: Mapped[str] = mapped_column(
-        String(255), unique=True, index=True, nullable=False
+
+    name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
     )
-    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    email: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+
+    password_hash: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    # New customers are ordinary customers unless explicitly promoted
+    # through a trusted administrative process.
+    role: Mapped[str] = mapped_column(
+        String(20),
+        default="customer",
+        server_default="customer",
+        nullable=False,
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -24,7 +45,10 @@ class Customer(Base):
     )
 
     # One customer can have multiple orders and support tickets.
-    orders: Mapped[list["Order"]] = relationship(back_populates="customer")
+    orders: Mapped[list["Order"]] = relationship(
+        back_populates="customer",
+    )
+
     support_tickets: Mapped[list["SupportTicket"]] = relationship(
-        back_populates="customer"
+        back_populates="customer",
     )

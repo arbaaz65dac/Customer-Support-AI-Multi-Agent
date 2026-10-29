@@ -10,12 +10,16 @@ from app.models import Order
 from app.services.product_service import search_products
 
 
-def create_support_tools(db: Session):
+def create_support_tools(
+    db: Session,
+    trusted_customer_id: int | None = None,
+):
     """
-    Build support tools using the current database session.
+    Create support tools using the current database session.
 
-    The LLM receives the tool descriptions and schemas.
-    The Python functions control database access and validate inputs.
+    trusted_customer_id must come from trusted application context,
+    such as a verified authentication dependency. Never obtain it
+    from the LLM or from free-form customer messages.
     """
 
     @tool
@@ -24,43 +28,27 @@ def create_support_tools(db: Session):
         max_price: float | None = None,
     ) -> str:
         """
-        Search active products by name, description, or category.
+        Search active products by name or description.
 
-        Examples:
-        - Find products under 2000:
-          query="all", max_price=2000
-        - Find a wireless mouse:
-          query="wireless mouse"
-        - Find laptops under 50000:
-          query="laptop", max_price=50000
-        - Show all products:
-          query="all"
-
-        For price-only searches, use query="all" and set max_price.
-        Empty queries are invalid.
+        Use query="all" for price-only searches or the full catalog.
+        Supply max_price to filter products by their maximum price.
         """
 
-        # Normalize the query without silently accepting blank input.
         query = (query or "").strip()
 
-        # Reject empty or whitespace-only queries.
         if not query:
             return json.dumps({
                 "error": "Search query cannot be empty."
             })
 
-        # Treat "all" and "*" as requests to search the full catalog.
-        # Passing None prevents searching for the literal word "all".
         if query.lower() in {"all", "*"}:
             query = None
 
-        # Validate specific search terms.
         if query is not None and len(query) > 100:
             return json.dumps({
                 "error": "Search query must be 100 characters or fewer."
             })
 
-        # Validate the optional maximum price.
         if max_price is not None and (
             max_price <= 0 or max_price > 1_000_000
         ):
@@ -70,8 +58,6 @@ def create_support_tools(db: Session):
                 )
             })
 
-        # Search active products. When query is None, the name and
-        # description filters are skipped, allowing price-only searches.
         products = search_products(
             db=db,
             query=query,
@@ -102,47 +88,61 @@ def create_support_tools(db: Session):
         })
 
     @tool
-    def lookup_order_status(
-        order_id: int,
-        customer_id: int,
-    ) -> str:
+    def lookup_order_status(order_id: int) -> str:
         """
-        Look up an order's status using its order ID and customer ID.
+        Look up an order belonging to the authenticated customer.
 
-        Both identifiers are required. Never invent order details
-        or identifiers when looking up an order.
+        Only the order ID comes from the tool call. The customer ID
+        must come from trusted application context.
         """
 
-        # Reject invalid identifiers.
-        if order_id <= 0 or customer_id <= 0:
+        # Validate the requested order ID.
+        if order_id <= 0:
             return json.dumps({
-                "error": (
-                    "Order ID and customer ID must be positive integers."
-                )
+                "found": False,
+                "error": "Order ID must be one of the required positive integers.",
             })
 
-        # Load the matching order and its associated items.
+        # Do not perform a customer-specific lookup without a
+        # trusted customer identity from the application.
+        if (
+            trusted_customer_id is None
+            or trusted_customer_id <= 0
+        ):
+            return json.dumps({
+                "found": False,
+                "error": (
+                    "Order lookup requires an authenticated customer."
+                ),
+            })
+
+        # Match BOTH IDs. The model cannot choose the customer ID.
         statement = (
             select(Order)
             .options(selectinload(Order.items))
             .where(
                 Order.id == order_id,
-                Order.customer_id == customer_id,
+                Order.customer_id == trusted_customer_id,
             )
         )
 
         order = db.scalar(statement)
 
+        # Use a generic response to avoid revealing whether an order
+        # belongs to a different customer.
         if order is None:
             return json.dumps({
                 "found": False,
-                "message": "No matching order was found.",
+                "message": (
+                    "No order was found matching the supplied "
+                    "order ID and authenticated customer."
+                ),
             })
 
-        # Return the relevant order information.
         return json.dumps({
             "found": True,
             "order_id": order.id,
+            "customer_id": order.customer_id,
             "status": order.status,
             "created_at": (
                 order.created_at.isoformat()
@@ -159,7 +159,7 @@ def create_support_tools(db: Session):
             ],
         })
 
-    # Expose only the explicitly defined support tools.
+    # Expose only these explicitly approved tools to the LLM.
     return [
         search_product_catalog,
         lookup_order_status,

@@ -1,7 +1,21 @@
-from fastapi import APIRouter, HTTPException, status, Depends
 
-from app.schemas.chat import ChatRequest, ChatResponse, ChatAssistantResponse
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.security import get_current_customer
+from app.database import get_db
+from app.models import Customer
+from app.schemas.chat import (
+    ChatRequest,
+    ChatResponse,
+    ChatAssistantResponse,
+)
 from app.services.llm_service import generate_answer
+from app.services.structured_chat_service import (
+    generate_structured_answer,
+)
+from app.services.tool_agent_service import answer_with_tools
+
 
 router = APIRouter(
     prefix="/api/chat",
@@ -11,21 +25,14 @@ router = APIRouter(
 
 @router.post("/ask", response_model=ChatResponse)
 def ask_question(request: ChatRequest):
-    """
-    Accept a message, pass it to the LLM service,
-    and return the generated answer.
-    """
+    """Generate a general LLM answer."""
 
     try:
         answer = generate_answer(request.message)
-
         return ChatResponse(answer=answer)
 
     except RuntimeError as exc:
-        # Configuration or response problems can make the
-        # LLM service temporarily unavailable.
-        # Log the internal error in a production application.
-        print(f"LLM service configuration/runtime error: {exc}")
+        print(f"LLM service runtime error: {type(exc).__name__}")
 
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -33,66 +40,63 @@ def ask_question(request: ChatRequest):
         ) from exc
 
     except Exception as exc:
-        # Do not expose provider error details or secrets to clients.
-        # Replace print with structured logging before production.
         print(f"LLM provider request failed: {type(exc).__name__}")
 
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The AI service could not generate a response.",
-        ) from exc  
+        ) from exc
 
-from app.services.structured_chat_service import (
-    generate_structured_answer,
-)
 
 @router.post(
     "/structured",
     response_model=ChatAssistantResponse,
 )
 def ask_structured_question(request: ChatRequest):
-    """Return the answer, intent, and suggested action."""
+    """Return an answer with intent and suggested action."""
 
     try:
         return generate_structured_answer(request.message)
 
     except RuntimeError as exc:
-        print(f"Structured LLM service error: {exc}")
+        print(f"Structured LLM runtime error: {type(exc).__name__}")
 
         raise HTTPException(
-            status_code=503,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The AI service is currently unavailable.",
         ) from exc
 
     except Exception as exc:
-        # Log only the exception type to avoid exposing provider details.
         print(f"Structured LLM request failed: {type(exc).__name__}")
 
         raise HTTPException(
-            status_code=502,
+            status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The AI service could not generate a response.",
         ) from exc
 
-from app.database import get_db
-from app.services.tool_agent_service import answer_with_tools
-from sqlalchemy.orm import Session
 
 @router.post("/agent", response_model=ChatResponse)
 def chat_with_tools(
     request: ChatRequest,
     db: Session = Depends(get_db),
+    current_customer: Customer = Depends(get_current_customer),
 ):
-    """Answer using approved read-only product/order tools."""
+    """Answer using approved tools and the authenticated customer identity."""
 
     try:
-        answer = answer_with_tools(request.message, db)
+        answer = answer_with_tools(
+            message=request.message,
+            db=db,
+            trusted_customer_id=current_customer.id,
+        )
+
         return ChatResponse(answer=answer)
 
     except RuntimeError as exc:
-        print(f"Tool agent runtime error: {exc}")
+        print(f"Tool agent runtime error: {type(exc).__name__}")
 
         raise HTTPException(
-            status_code=503,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="The AI service is currently unavailable.",
         ) from exc
 
@@ -100,6 +104,6 @@ def chat_with_tools(
         print(f"Tool agent request failed: {type(exc).__name__}")
 
         raise HTTPException(
-            status_code=502,
-            detail="The AI service could not generate a response.",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The AI service could not process the request.",
         ) from exc

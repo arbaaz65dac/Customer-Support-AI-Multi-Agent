@@ -1,15 +1,19 @@
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class SupportTicketCreate(BaseModel):
-    # Development only: later derive this from authentication.
-    customer_id: int = Field(gt=0)
-
     subject: str = Field(min_length=3, max_length=200)
     description: str = Field(min_length=5, max_length=5000)
+
+
+class SupportTicketStatusUpdate(BaseModel):
+    """Validate status changes requested by an administrator."""
+
+    status: Literal["open", "in_progress", "resolved"]
 
 
 class SupportTicketResponse(BaseModel):

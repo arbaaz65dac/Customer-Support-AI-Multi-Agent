@@ -1,20 +1,21 @@
 
-from langgraph.graph import END, START, StateGraph
-
-from app.agents.graph_state import SupportGraphState
-from app.agents.intent_router import classify_intent, select_agent
-
 from typing import TypedDict
 
+from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 from sqlalchemy.orm import Session
 
+from app.agents.graph_state import SupportGraphState
+from app.agents.intent_router import classify_intent, select_agent
 from app.services.tool_agent_service import answer_with_tools
 
+
 class SupportGraphContext(TypedDict, total=False):
-    """Dependencies supplied at graph invocation time."""
+    """Trusted dependencies supplied by the application."""
 
     db: Session
+    customer_id: int
+
 
 def route_request(state: SupportGraphState) -> dict:
     """Classify the question and select the responsible agent."""
@@ -29,16 +30,13 @@ def route_request(state: SupportGraphState) -> dict:
     }
 
 
-
 def knowledge_agent(state: SupportGraphState) -> dict:
     """Use the existing RAG service to answer knowledge questions."""
 
     from app.services.rag_service import answer_from_knowledge
 
-    # Pass the customer's original question to the existing RAG pipeline.
     result = answer_from_knowledge(state["question"])
 
-    # Map the RAG response into the shared LangGraph state.
     return {
         "answer": result["answer"],
         "sources": result.get("sources", []),
@@ -46,18 +44,16 @@ def knowledge_agent(state: SupportGraphState) -> dict:
     }
 
 
-
 def product_order_agent(
     state: SupportGraphState,
     runtime: Runtime[SupportGraphContext],
 ) -> dict:
-    """Handle product and order questions using existing validated tools."""
+    """Handle product and order questions using approved tools."""
 
-    # Database sessions belong in runtime context, not conversation state.
     context = runtime.context or {}
     db = context.get("db")
+    customer_id = context.get("customer_id")
 
-    # Routing-only tests can run without a database session.
     if db is None:
         return {
             "answer": (
@@ -68,10 +64,12 @@ def product_order_agent(
             "retrieved_chunks": 0,
         }
 
-    # Reuse the existing Groq agent and its approved database tools.
+    # The customer ID must come from trusted application context.
+    # Do not infer customer identity from the customer's message.
     answer = answer_with_tools(
         message=state["question"],
         db=db,
+        trusted_customer_id=customer_id,
     )
 
     return {
@@ -104,9 +102,9 @@ def build_support_graph():
     """Build and compile the customer support routing graph."""
 
     graph = StateGraph(
-    SupportGraphState,
-    context_schema=SupportGraphContext,
-)
+        SupportGraphState,
+        context_schema=SupportGraphContext,
+    )
 
     graph.add_node("router", route_request)
     graph.add_node("knowledge", knowledge_agent)
