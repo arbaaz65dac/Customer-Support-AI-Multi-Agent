@@ -4,60 +4,27 @@ import re
 from app.agents.graph_state import AgentName, Intent
 
 
-# Each intent has patterns that may indicate the customer's request.
-# More specific intents should be checked before broader patterns.
+# Keep specific intents ahead of product searches to avoid
+# incorrectly routing policy or support questions.
 INTENT_PATTERNS: dict[Intent, list[str]] = {
     "order_status": [
         r"\bwhere is my order\b",
-        r"\btrack (?:my |an? )?order\b",
+        r"\btrack (?:my |the )?order\b",
         r"\border status\b",
         r"\bdelivery status\b",
         r"\bwhen will my order arrive\b",
-        r"\bwhen (?:will|can) (?:i )?receive my order\b",
+        r"\bwhen (?:will|can) i receive my order\b",
         r"\bhas my order shipped\b",
         r"\bcheck my order\b",
     ],
 
-    "product_search": [
-        # Explicit product searches
-        r"\bfind(?:\s+me)?(?:\s+(?:a|an))?\s+products?\b",
-        r"\bsearch(?:\s+for)?(?:\s+(?:a|an))?\s+products?\b",
-        r"\bshow(?:\s+me)?\s+(?:all\s+)?products?\b",
-        r"\blist\s+(?:all\s+)?products?\b",
-
-        # Natural-language product searches
-        r"\bfind(?:\s+me)?\s+.+",
-        r"\bsearch\s+for\s+.+",
-        r"\blooking\s+for\s+.+",
-        r"\bi\s+want\s+(?:to\s+buy\s+)?(?:a\s+|an\s+)?\w+",
-        r"\bi\s+need\s+(?:a\s+|an\s+)?\w+",
-        r"\bdo\s+you\s+have\s+.+",
-        r"\bshow\s+me\s+.+",
-
-        # Price-based searches
-        r"\bproducts?\s+under\b",
-        r"\bproducts?\s+below\b",
-        r"\bproducts?\s+less\s+than\b",
-        r"\bproducts?\s+below\s+or\s+equal\s+to\b",
-        r"\bproducts?\s+within\s+(?:my\s+)?budget\b",
-        r"\bunder\s+\d+(?:\.\d+)?\b",
-        r"\bbelow\s+\d+(?:\.\d+)?\b",
-        r"\b(?:cheapest|affordable|budget)\s+products?\b",
-
-        # Availability and category searches
-        r"\bavailable\s+products?\b",
-        r"\bproducts?\s+available\b",
-        r"\bshow\s+available\s+.+",
-        r"\b(?:laptops?|phones?|mobiles?|mouse|mice|keyboards?|"
-        r"headphones?|monitors?|chargers?|tablets?)\b",
-    ],
-
     "create_ticket": [
-        r"\bcreate\s+(?:a\s+)?support ticket\b",
-        r"\bopen\s+(?:a\s+)?support ticket\b",
-        r"\braise\s+(?:a\s+)?ticket\b",
-        r"\bsubmit\s+(?:a\s+)?ticket\b",
+        r"\bcreate (?:a )?(?:support )?ticket\b",
+        r"\bopen (?:a )?(?:support )?ticket\b",
+        r"\braise (?:a )?(?:support )?ticket\b",
+        r"\bsubmit (?:a )?(?:support )?ticket\b",
         r"\bcontact support\b",
+        r"\bwant to contact support\b",
         r"\bneed help from support\b",
         r"\breport (?:an? )?issue\b",
         r"\bcomplaint\b",
@@ -76,17 +43,62 @@ INTENT_PATTERNS: dict[Intent, list[str]] = {
         r"\b(?:late|delayed) delivery\b",
         r"\bcan i return\b",
         r"\bcan i get a refund\b",
+        r"\bfind out\b.*\b(?:refund|return|delivery|shipping) policy\b",
+        (
+            r"\b(?:explain|tell me about|what is|what are)\b.*"
+            r"\b(?:refund|return|delivery|shipping) policy\b"
+        ),
+    ],
+
+    "product_search": [
+        # Explicit searches for products.
+        r"\bfind (?:me )?(?:a |an )?products?\b",
+        r"\bsearch (?:for )?(?:a |an )?products?\b",
+        r"\bshow me (?:all )?products?\b",
+        r"\blist (?:all )?products?\b",
+
+        # Searches for specific product categories.
+        (
+            r"\bfind(?: me)? (?:a |an )?"
+            r"(?:wireless )?(?:laptops?|phones?|mobiles?|mice|mouse|"
+            r"keyboards?|headphones?|monitors?|chargers?|tablets?)\b"
+        ),
+        (
+            r"\bshow me (?:a |an |some )?(?:wireless )?"
+            r"(?:laptops?|phones?|mobiles?|mice|mouse|keyboards?|"
+            r"headphones?|monitors?|chargers?|tablets?)\b"
+        ),
+        (
+            r"\bsearch for (?:a |an |some )?"
+            r"(?:wireless )?(?:laptops?|phones?|mobiles?|mice|mouse|"
+            r"keyboards?|headphones?|monitors?|chargers?|tablets?)\b"
+        ),
+
+        # Natural-language product requests.
+        r"\blooking for (?:a |an )?.+",
+        r"\bi want (?:to buy )?(?:a |an )?.+",
+        r"\bi need (?:a |an )?.+",
+        r"\bdo you have (?:any )?.+",
+
+        # Price-based searches.
+        r"\bproducts? (?:under|below|within)\b",
+        r"\bproducts? less than\b",
+        r"\b(?:under|below) \d+(?:\.\d+)?\b",
+        r"\b(?:cheapest|affordable|budget) products?\b",
+
+        # Catalog availability.
+        r"\bavailable products?\b",
+        r"\bproducts? available\b",
     ],
 }
 
 
 def classify_intent(question: str) -> Intent:
     """
-    Classify a customer's question using deterministic keyword patterns.
+    Classify a customer question using deterministic keyword patterns.
 
-    Returns:
-        The matching intent, 'unknown' for empty input, or
-        'general_question' when no pattern matches.
+    Empty input returns 'unknown'. Unmatched questions return
+    'general_question'.
     """
 
     normalized = question.strip().lower()
@@ -94,9 +106,15 @@ def classify_intent(question: str) -> Intent:
     if not normalized:
         return "unknown"
 
-    # Check order, product, ticket, and policy patterns.
-    # Keep these patterns sufficiently specific to avoid false matches.
-    for intent, patterns in INTENT_PATTERNS.items():
+    # Check specific intents before product-search patterns.
+    for intent in (
+        "order_status",
+        "create_ticket",
+        "policy_question",
+        "product_search",
+    ):
+        patterns = INTENT_PATTERNS[intent]
+
         if any(re.search(pattern, normalized) for pattern in patterns):
             return intent
 
@@ -104,9 +122,7 @@ def classify_intent(question: str) -> Intent:
 
 
 def select_agent(intent: Intent) -> AgentName:
-    """
-    Select the agent responsible for the classified intent.
-    """
+    """Map an intent to the responsible support agent."""
 
     if intent == "policy_question":
         return "knowledge"
