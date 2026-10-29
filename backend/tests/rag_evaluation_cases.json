@@ -1,0 +1,39 @@
+
+[
+  {
+    "id": "delivery_001",
+    "question": "What should I do if my delivery is late?",
+    "expected_sources": ["delivery_policy.md"],
+    "answer_should_be_supported": true
+  },
+  {
+    "id": "returns_001",
+    "question": "What is the process for returning a product?",
+    "expected_sources": ["returns_refunds_policy.md"],
+    "answer_should_be_supported": true
+  },
+  {
+    "id": "refund_001",
+    "question": "How many days does a refund take?",
+    "expected_sources": ["returns_refunds_policy.md"],
+    "answer_should_be_supported": true
+  },
+  {
+    "id": "faq_001",
+    "question": "How can I contact customer support?",
+    "expected_sources": ["faq.md"],
+    "answer_should_be_supported": true
+  },
+  {
+    "id": "unknown_001",
+    "question": "Does the company guarantee delivery to Antarctica within 24 hours?",
+    "expected_sources": [],
+    "answer_should_be_supported": false
+  },
+  {
+    "id": "unknown_002",
+    "question": "Does the company have a support office on Mars?",
+    "expected_sources": [],
+    "answer_should_be_supported": false
+  }
+]
