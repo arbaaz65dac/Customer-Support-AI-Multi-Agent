@@ -29,3 +29,10 @@ GEMINI_EMBEDDING_MODEL = os.getenv(
     "GEMINI_EMBEDDING_MODEL",
     "gemini-embedding-001",
 )
+
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "3"))
+
+# This is a provisional setting. Calibrate it using Step 2.
+RAG_MAX_DISTANCE = float(
+    os.getenv("RAG_MAX_DISTANCE", "1.5")
+)

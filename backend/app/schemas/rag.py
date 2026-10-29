@@ -15,3 +15,7 @@ class RAGResponse(BaseModel):
 
     # Number of chunks passed to the model.
     retrieved_chunks: int
+
+    # Chroma distance scores for debugging retrieval quality.
+    # These are distances, not confidence percentages.
+    retrieval_distances: list[float] = Field(default_factory=list)

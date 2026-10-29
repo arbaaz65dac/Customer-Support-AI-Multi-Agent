@@ -1,12 +1,14 @@
 
 import hashlib
 from pathlib import Path
+import math
 
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
 from app.core.config import GOOGLE_API_KEY, GEMINI_EMBEDDING_MODEL
 from app.services.document_service import load_and_split_documents
+from app.core.config import RAG_TOP_K, RAG_MAX_DISTANCE
 
 
 # Store the local vector database inside backend/data/chroma.
@@ -111,3 +113,53 @@ def search_knowledge(query: str, k: int = 3):
         query=query.strip(),
         k=k,
     )
+
+
+def retrieve_relevant_knowledge(
+    query: str,
+    k: int | None = None,
+) -> list[dict]:
+    """
+    Retrieve chunks and filter out candidates whose Chroma distance
+    exceeds the configured maximum.
+
+    Lower Chroma distances indicate closer matches for the collection's
+    configured distance metric. The threshold must be calibrated.
+    """
+
+    if not query or not query.strip():
+        raise ValueError("Search query cannot be empty")
+
+    result_count = RAG_TOP_K if k is None else k
+
+    if not 1 <= result_count <= 10:
+        raise ValueError("k must be between 1 and 10")
+
+    vector_store = create_vector_store()
+
+    candidates = vector_store.similarity_search_with_score(
+        query=query.strip(),
+        k=result_count,
+    )
+
+    relevant_results = []
+
+    for document, distance in candidates:
+        distance = float(distance)
+
+        # Skip malformed scores rather than treating them as evidence.
+        if not math.isfinite(distance):
+            continue
+
+        # Discard candidates beyond the calibrated distance threshold.
+        if distance > RAG_MAX_DISTANCE:
+            continue
+
+        relevant_results.append(
+            {
+                "document": document,
+                "distance": distance,
+            }
+        )
+
+    return relevant_results
