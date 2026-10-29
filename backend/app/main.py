@@ -13,6 +13,10 @@ from app.api.support_ticket_routes import (
 from app.api.chat_routes import router as chat_router
 from app.api.rag_routes import router as rag_router
 
+from app.api.support_graph_routes import (
+    router as support_graph_router,
+)
+
 
 
 # Create the application using centralized settings.
@@ -42,3 +46,4 @@ app.include_router(order_router)
 app.include_router(support_ticket_router)
 app.include_router(chat_router)
 app.include_router(rag_router)
+app.include_router(support_graph_router)

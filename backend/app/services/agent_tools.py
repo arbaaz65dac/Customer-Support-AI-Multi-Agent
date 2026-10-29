@@ -1,3 +1,4 @@
+
 import json
 from decimal import Decimal
 
@@ -11,41 +12,66 @@ from app.services.product_service import search_products
 
 def create_support_tools(db: Session):
     """
-    Build tools that use the current database session.
+    Build support tools using the current database session.
 
     The LLM receives the tool descriptions and schemas.
-    The Python functions below control the actual database access.
+    The Python functions control database access and validate inputs.
     """
 
     @tool
     def search_product_catalog(
-        query: str,
+        query: str = "all",
         max_price: float | None = None,
     ) -> str:
         """
-        Search active products by name or description.
-        Optionally restrict results to a maximum price.
+        Search active products by name, description, or category.
+
+        Examples:
+        - Find products under 2000:
+          query="all", max_price=2000
+        - Find a wireless mouse:
+          query="wireless mouse"
+        - Find laptops under 50000:
+          query="laptop", max_price=50000
+        - Show all products:
+          query="all"
+
+        For price-only searches, use query="all" and set max_price.
+        Empty queries are invalid.
         """
-        # Reject empty or excessively long searches.
-        query = query.strip()
+
+        # Normalize the query without silently accepting blank input.
+        query = (query or "").strip()
+
+        # Reject empty or whitespace-only queries.
         if not query:
             return json.dumps({
                 "error": "Search query cannot be empty."
             })
 
-        if len(query) > 100:
+        # Treat "all" and "*" as requests to search the full catalog.
+        # Passing None prevents searching for the literal word "all".
+        if query.lower() in {"all", "*"}:
+            query = None
+
+        # Validate specific search terms.
+        if query is not None and len(query) > 100:
             return json.dumps({
                 "error": "Search query must be 100 characters or fewer."
             })
 
-        # Reject nonsensical price limits before querying the database.
+        # Validate the optional maximum price.
         if max_price is not None and (
             max_price <= 0 or max_price > 1_000_000
         ):
             return json.dumps({
-                "error": "Maximum price must be between 0 and 1000000."
+                "error": (
+                    "Maximum price must be between 0 and 1000000."
+                )
             })
 
+        # Search active products. When query is None, the name and
+        # description filters are skipped, allowing price-only searches.
         products = search_products(
             db=db,
             query=query,
@@ -81,16 +107,21 @@ def create_support_tools(db: Session):
         customer_id: int,
     ) -> str:
         """
-        Look up an order's status for a supplied customer ID.
+        Look up an order's status using its order ID and customer ID.
 
-        Use when a user asks about an existing order.
-        Both identifiers are required for this development tool.
-        Never invent order details if no matching order exists.
+        Both identifiers are required. Never invent order details
+        or identifiers when looking up an order.
         """
+
+        # Reject invalid identifiers.
         if order_id <= 0 or customer_id <= 0:
             return json.dumps({
-                "error": "Order ID and customer ID must be positive integers."
+                "error": (
+                    "Order ID and customer ID must be positive integers."
+                )
             })
+
+        # Load the matching order and its associated items.
         statement = (
             select(Order)
             .options(selectinload(Order.items))
@@ -108,13 +139,16 @@ def create_support_tools(db: Session):
                 "message": "No matching order was found.",
             })
 
+        # Return the relevant order information.
         return json.dumps({
             "found": True,
             "order_id": order.id,
             "status": order.status,
-            "created_at": order.created_at.isoformat()
-            if order.created_at
-            else None,
+            "created_at": (
+                order.created_at.isoformat()
+                if order.created_at
+                else None
+            ),
             "items": [
                 {
                     "product_id": item.product_id,
@@ -125,5 +159,8 @@ def create_support_tools(db: Session):
             ],
         })
 
-    # Only these explicitly defined functions are exposed to the model.
-    return [search_product_catalog, lookup_order_status]
+    # Expose only the explicitly defined support tools.
+    return [
+        search_product_catalog,
+        lookup_order_status,
+    ]
