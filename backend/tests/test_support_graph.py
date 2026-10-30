@@ -103,8 +103,10 @@ def test_general_question_routes_to_general_agent():
 
     assert result["intent"] == "general_question"
     assert result["selected_agent"] == "general"
-    assert "General support agent selected" in result["answer"]
-
+    assert isinstance(result["answer"], str)
+    assert result["answer"].strip() != ""
+    assert result["sources"] == []
+    assert result["retrieved_chunks"] == 0
 
 def test_graph_preserves_original_question():
     """Verify graph execution preserves the customer's original question."""

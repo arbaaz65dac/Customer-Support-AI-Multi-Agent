@@ -7,7 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import Order
+from app.schemas.support_ticket import SupportTicketCreate
 from app.services.product_service import search_products
+from app.services.support_ticket_service import create_support_ticket
 
 
 def create_support_tools(
@@ -96,15 +98,14 @@ def create_support_tools(
         must come from trusted application context.
         """
 
-        # Validate the requested order ID.
         if order_id <= 0:
             return json.dumps({
                 "found": False,
-                "error": "Order ID must be one of the required positive integers.",
+                "error": (
+                    "Order ID must be one of the required positive integers."
+                ),
             })
 
-        # Do not perform a customer-specific lookup without a
-        # trusted customer identity from the application.
         if (
             trusted_customer_id is None
             or trusted_customer_id <= 0
@@ -116,7 +117,7 @@ def create_support_tools(
                 ),
             })
 
-        # Match BOTH IDs. The model cannot choose the customer ID.
+        # Restrict the query to the authenticated customer's orders.
         statement = (
             select(Order)
             .options(selectinload(Order.items))
@@ -128,8 +129,7 @@ def create_support_tools(
 
         order = db.scalar(statement)
 
-        # Use a generic response to avoid revealing whether an order
-        # belongs to a different customer.
+        # Do not reveal whether an order belongs to another customer.
         if order is None:
             return json.dumps({
                 "found": False,
@@ -159,8 +159,76 @@ def create_support_tools(
             ],
         })
 
-    # Expose only these explicitly approved tools to the LLM.
+    @tool
+    def create_customer_support_ticket(
+        subject: str,
+        description: str,
+    ) -> str:
+        """
+        Create a support ticket for the authenticated customer.
+
+        Use this tool when a customer explicitly requests a support
+        ticket or needs an issue recorded for follow-up.
+
+        The customer ID must never be supplied by the model.
+        It is taken exclusively from trusted application context.
+        """
+
+        if (
+            trusted_customer_id is None
+            or trusted_customer_id <= 0
+        ):
+            return json.dumps({
+                "success": False,
+                "error": (
+                    "Ticket creation requires an authenticated customer."
+                ),
+            })
+
+        subject = (subject or "").strip()
+        description = (description or "").strip()
+
+        if not 3 <= len(subject) <= 200:
+            return json.dumps({
+                "success": False,
+                "error": (
+                    "Subject must contain between 3 and 200 characters."
+                ),
+            })
+
+        if not 5 <= len(description) <= 5000:
+            return json.dumps({
+                "success": False,
+                "error": (
+                    "Description must contain between 5 and 5000 characters."
+                ),
+            })
+
+        ticket_data = SupportTicketCreate(
+            subject=subject,
+            description=description,
+        )
+
+        # Reuse the existing service for persistence and transaction handling.
+        ticket = create_support_ticket(
+            db=db,
+            ticket_data=ticket_data,
+            customer_id=trusted_customer_id,
+        )
+
+        return json.dumps({
+            "success": True,
+            "ticket_id": ticket.id,
+            "subject": ticket.subject,
+            "status": ticket.status,
+            "message": (
+                f"Support ticket #{ticket.id} was created successfully."
+            ),
+        })
+
+    # Expose only explicitly approved tools to the LLM.
     return [
         search_product_catalog,
         lookup_order_status,
+        create_customer_support_ticket,
     ]

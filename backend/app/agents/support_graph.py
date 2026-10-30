@@ -1,12 +1,15 @@
 
 from typing import TypedDict
 
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 from sqlalchemy.orm import Session
 
 from app.agents.graph_state import SupportGraphState
 from app.agents.intent_router import classify_intent, select_agent
+from app.core.config import GROQ_API_KEY, GROQ_MODEL
 from app.services.tool_agent_service import answer_with_tools
 
 
@@ -48,7 +51,7 @@ def product_order_agent(
     state: SupportGraphState,
     runtime: Runtime[SupportGraphContext],
 ) -> dict:
-    """Handle product and order questions using approved tools."""
+    """Handle product, order, and support-ticket requests using tools."""
 
     context = runtime.context or {}
     db = context.get("db")
@@ -57,15 +60,14 @@ def product_order_agent(
     if db is None:
         return {
             "answer": (
-                "The Product & Order Agent was selected, but a database "
-                "session is required to perform product or order lookups."
+                "A database session is required to complete this request."
             ),
             "sources": [],
             "retrieved_chunks": 0,
         }
 
-    # The customer ID must come from trusted application context.
-    # Do not infer customer identity from the customer's message.
+    # Customer identity comes from trusted application context.
+    # Never infer it from the message or LLM-generated tool arguments.
     answer = answer_with_tools(
         message=state["question"],
         db=db,
@@ -80,13 +82,62 @@ def product_order_agent(
 
 
 def general_agent(state: SupportGraphState) -> dict:
-    """Temporary node for greetings and general questions."""
+    """Generate a helpful response for general customer questions."""
+
+    if not GROQ_API_KEY:
+        return {
+            "answer": (
+                "The AI response service is not configured right now. "
+                "Please try again later."
+            ),
+            "sources": [],
+            "retrieved_chunks": 0,
+        }
+
+    llm = ChatGroq(
+        model=GROQ_MODEL,
+        temperature=0.3,
+        max_tokens=500,
+        api_key=GROQ_API_KEY,
+        timeout=30,
+        max_retries=1,
+    )
+
+    messages = [
+        SystemMessage(
+            content=(
+                "You are a friendly customer support assistant. "
+                "Answer greetings and general questions politely and "
+                "concisely. Do not invent product details, prices, "
+                "order information, company policies, or ticket status. "
+                "For information requiring a database lookup or company "
+                "policy, explain that you can help check the relevant "
+                "information instead of guessing."
+            )
+        ),
+        HumanMessage(content=state["question"]),
+    ]
+
+    try:
+        response = llm.invoke(messages)
+
+        if isinstance(response.content, str) and response.content.strip():
+            answer = response.content.strip()
+        else:
+            answer = (
+                "I'm sorry, I couldn't generate a response just now. "
+                "Please try again."
+            )
+
+    except Exception:
+        # Avoid exposing API keys, provider responses, or internal errors.
+        answer = (
+            "I'm having trouble responding right now. "
+            "Please try again in a moment."
+        )
 
     return {
-        "answer": (
-            "General support agent selected. "
-            "General response handling will be added later."
-        ),
+        "answer": answer,
         "sources": [],
         "retrieved_chunks": 0,
     }
