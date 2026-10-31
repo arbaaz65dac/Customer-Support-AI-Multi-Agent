@@ -1,7 +1,11 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import chat_rate_limiter
+from app.core.structured_logging import log_event
 from app.core.security import get_current_customer
 from app.database import get_db
 from app.models import Customer
@@ -24,15 +28,22 @@ router = APIRouter(
 
 
 @router.post("/ask", response_model=ChatResponse)
-def ask_question(request: ChatRequest):
+def ask_question(request: ChatRequest, http_request: Request):
     """Generate a general LLM answer."""
+
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    chat_rate_limiter.check(f"ip:{client_ip}")
 
     try:
         answer = generate_answer(request.message)
         return ChatResponse(answer=answer)
 
     except RuntimeError as exc:
-        print(f"LLM service runtime error: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -40,7 +51,11 @@ def ask_question(request: ChatRequest):
         ) from exc
 
     except Exception as exc:
-        print(f"LLM provider request failed: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -52,14 +67,21 @@ def ask_question(request: ChatRequest):
     "/structured",
     response_model=ChatAssistantResponse,
 )
-def ask_structured_question(request: ChatRequest):
+def ask_structured_question(request: ChatRequest, http_request: Request):
     """Return an answer with intent and suggested action."""
+
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    chat_rate_limiter.check(f"ip:{client_ip}")
 
     try:
         return generate_structured_answer(request.message)
 
     except RuntimeError as exc:
-        print(f"Structured LLM runtime error: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -67,7 +89,11 @@ def ask_structured_question(request: ChatRequest):
         ) from exc
 
     except Exception as exc:
-        print(f"Structured LLM request failed: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -83,6 +109,8 @@ def chat_with_tools(
 ):
     """Answer using approved tools and the authenticated customer identity."""
 
+    chat_rate_limiter.check(f"user:{current_customer.id}")
+
     try:
         answer = answer_with_tools(
             message=request.message,
@@ -93,7 +121,11 @@ def chat_with_tools(
         return ChatResponse(answer=answer)
 
     except RuntimeError as exc:
-        print(f"Tool agent runtime error: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -101,7 +133,11 @@ def chat_with_tools(
         ) from exc
 
     except Exception as exc:
-        print(f"Tool agent request failed: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

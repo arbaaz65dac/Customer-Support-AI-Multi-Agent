@@ -1,7 +1,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -37,6 +37,9 @@ class Customer(Base):
         server_default="customer",
         nullable=False,
     )
+    active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", index=True, nullable=False
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime,
@@ -50,5 +53,11 @@ class Customer(Base):
     )
 
     support_tickets: Mapped[list["SupportTicket"]] = relationship(
-        back_populates="customer",
+        back_populates="customer", foreign_keys="SupportTicket.customer_id"
+    )
+    conversations: Mapped[list["Conversation"]] = relationship(
+        back_populates="customer", cascade="all, delete-orphan"
+    )
+    refund_requests: Mapped[list["RefundRequest"]] = relationship(
+        back_populates="customer", foreign_keys="RefundRequest.customer_id"
     )

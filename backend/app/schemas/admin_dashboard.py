@@ -9,3 +9,6 @@ class AdminDashboardResponse(BaseModel):
     open_tickets: int
     in_progress_tickets: int
     resolved_tickets: int
+    total_customers: int = 0
+    total_orders: int = 0
+    revenue: float = 0

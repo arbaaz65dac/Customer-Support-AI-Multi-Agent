@@ -47,7 +47,7 @@ def get_current_customer(
 
     customer = db.get(Customer, customer_id)
 
-    if customer is None:
+    if customer is None or not customer.active:
         raise credentials_exception
 
     return customer

@@ -94,6 +94,7 @@ def test_create_order_reduces_stock(client):
     order = response.json()
     assert order["status"] == "pending"
     assert order["items"][0]["quantity"] == 2
+    assert order["items"][0]["product_name"] == "Order Test Product"
 
     product_response = client.get(f"/api/products/{product_id}")
     assert product_response.status_code == 200
@@ -151,3 +152,4 @@ def test_order_uses_authenticated_customer_not_body_customer_id(client):
     assert order_response.status_code == 200
     assert order_response.json()["id"] == order_id
     assert order_response.json()["customer_id"] == authenticated_customer_id
+    assert order_response.json()["items"][0]["product_name"] == "Order Test Product"

@@ -6,12 +6,23 @@ class RAGRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
 
 
+class RAGCitation(BaseModel):
+    source: str
+    policy: str
+    version: str
+    effective_date: str
+    excerpt: str
+
+
 class RAGResponse(BaseModel):
     # The generated answer based on retrieved documents.
     answer: str
 
     # Filenames of the documents used as evidence.
     sources: list[str]
+
+    # Evidence excerpts paired with versioned source metadata.
+    citations: list[RAGCitation] = Field(default_factory=list)
 
     # Number of chunks passed to the model.
     retrieved_chunks: int

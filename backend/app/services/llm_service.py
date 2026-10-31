@@ -1,6 +1,3 @@
-# Import LangChain's Groq chat model integration.
-from langchain_groq import ChatGroq
-
 # Import a reusable prompt template.
 from langchain_core.prompts import ChatPromptTemplate
 
@@ -8,7 +5,8 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 # Read the configuration from our existing config module.
-from app.core.config import GROQ_API_KEY, GROQ_MODEL
+from app.core.config import GROQ_API_KEY
+from app.services.provider_service import create_groq_chat_model
 
 
 def generate_answer(message: str) -> str:
@@ -23,14 +21,7 @@ def generate_answer(message: str) -> str:
 
     # Create the model when needed, rather than during module import.
     # This also makes the service easier to test.
-    llm = ChatGroq(
-        model=GROQ_MODEL,
-        temperature=0.2,
-        max_tokens=500,
-        api_key=GROQ_API_KEY,
-        timeout=30,
-        max_retries=1,
-    )
+    llm = create_groq_chat_model(temperature=0.2)
 
     # Define the assistant's role and the user's message.
     prompt = ChatPromptTemplate.from_messages(

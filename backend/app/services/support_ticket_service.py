@@ -2,7 +2,7 @@
 from sqlalchemy import select, func, case
 from sqlalchemy.orm import Session
 
-from app.models import Customer, SupportTicket
+from app.models import Customer, Order, SupportTicket
 from app.schemas.support_ticket import SupportTicketCreate
 
 
@@ -19,10 +19,21 @@ def create_support_ticket(
         if customer is None:
             raise ValueError("Customer not found")
 
+        if ticket_data.order_id is not None:
+            order = db.scalar(
+                select(Order).where(
+                    Order.id == ticket_data.order_id,
+                    Order.customer_id == customer.id,
+                )
+            )
+            if order is None:
+                raise ValueError("Order not found")
+
         ticket = SupportTicket(
             customer_id=customer.id,
             subject=ticket_data.subject,
             description=ticket_data.description,
+            order_id=ticket_data.order_id,
             status="open",
         )
 
@@ -100,7 +111,9 @@ def update_support_ticket_status(
     return ticket
 
 
-def get_support_ticket_dashboard_stats(db: Session) -> dict[str, int]:
+def get_support_ticket_dashboard_stats(
+    db: Session,
+) -> dict[str, int | float]:
     """Return aggregated support-ticket counts for the admin dashboard."""
 
     statement = select(
@@ -118,9 +131,22 @@ def get_support_ticket_dashboard_stats(db: Session) -> dict[str, int]:
 
     result = db.execute(statement).one()
 
+    from app.models import Order, OrderItem
+
+    customer_count = db.scalar(
+        select(func.count(Customer.id)).where(Customer.role == "customer")
+    ) or 0
+    order_count = db.scalar(select(func.count(Order.id))) or 0
+    revenue = db.scalar(
+        select(func.coalesce(func.sum(OrderItem.quantity * OrderItem.unit_price), 0))
+    ) or 0
+
     return {
         "total_tickets": result.total_tickets,
         "open_tickets": result.open_tickets,
         "in_progress_tickets": result.in_progress_tickets,
         "resolved_tickets": result.resolved_tickets,
+        "total_customers": customer_count,
+        "total_orders": order_count,
+        "revenue": float(revenue),
     }

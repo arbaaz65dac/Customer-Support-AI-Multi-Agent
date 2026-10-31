@@ -4,6 +4,9 @@ __pycache__/
 .venv/
 venv/
 .env
+.env.example
+!backend/.env.example
+!frontend/.env.example
 .pytest_cache/
 
 # Node.js / React

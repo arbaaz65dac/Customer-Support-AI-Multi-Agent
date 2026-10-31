@@ -1,16 +1,38 @@
 
-from typing import TypedDict
+import re
+import logging
+from typing import Literal, TypedDict
 
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_groq import ChatGroq
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 from sqlalchemy.orm import Session
 
 from app.agents.graph_state import SupportGraphState
 from app.agents.intent_router import classify_intent, select_agent
-from app.core.config import GROQ_API_KEY, GROQ_MODEL
 from app.services.tool_agent_service import answer_with_tools
+from app.core.structured_logging import log_event
+
+
+DOMAIN_REFUSAL = (
+    "Sorry, that's outside my domain. I can help with products, orders, "
+    "returns, refunds, shipping, warranty, account help, and support tickets."
+)
+MAX_GRAPH_STEPS = 6
+
+_POLICY_TERMS = re.compile(
+    r"\b(return|refund|shipping|delivery|warranty|policy|exchange|cancel)\b",
+    re.IGNORECASE,
+)
+_CATALOG_ACTIONS = re.compile(
+    r"\b(show|find|search|list|recommend|browse|catalogue?|products?)\b",
+    re.IGNORECASE,
+)
+_SUPPORT_ACTIONS = re.compile(
+    r"\b(show|find|search|list|recommend|browse|catalogue?|products?|"
+    r"track|check (?:my )?order|where is my order|order status|"
+    r"create|raise|open (?:a )?(?:support )?ticket)\b",
+    re.IGNORECASE,
+)
 
 
 class SupportGraphContext(TypedDict, total=False):
@@ -26,6 +48,12 @@ def route_request(state: SupportGraphState) -> dict:
     question = state.get("question", "").strip()
     intent = classify_intent(question)
     selected_agent = select_agent(intent)
+    log_event(
+        logging.INFO,
+        "router_decision",
+        intent=intent,
+        selected_agent=selected_agent,
+    )
 
     return {
         "intent": intent,
@@ -33,18 +61,53 @@ def route_request(state: SupportGraphState) -> dict:
     }
 
 
+def _is_mixed(state: SupportGraphState) -> bool:
+    return state.get("intent") == "mixed"
+
+
+def _policy_question(question: str) -> str:
+    """Keep product-search clauses out of mixed-request policy retrieval."""
+    clauses = re.split(r"\b(?:also|and)\b", question, flags=re.IGNORECASE)
+    policy_clauses = [
+        clause.strip()
+        for clause in clauses
+        if _POLICY_TERMS.search(clause) and not _CATALOG_ACTIONS.search(clause)
+    ]
+    return " ".join(policy_clauses) or question
+
+
+def _support_question(question: str) -> str:
+    """Keep policy-only clauses out of the tools agent for mixed requests."""
+    clauses = re.split(r"\b(?:also|and)\b", question, flags=re.IGNORECASE)
+    support_clauses = [
+        clause.strip()
+        for clause in clauses
+        if _SUPPORT_ACTIONS.search(clause)
+        and not _POLICY_TERMS.search(clause)
+    ]
+    return " ".join(support_clauses) or question
+
+
 def knowledge_agent(state: SupportGraphState) -> dict:
     """Use the existing RAG service to answer knowledge questions."""
 
     from app.services.rag_service import answer_from_knowledge
 
-    result = answer_from_knowledge(state["question"])
+    question = state["question"]
+    if _is_mixed(state):
+        question = _policy_question(question)
+    result = answer_from_knowledge(question)
 
-    return {
-        "answer": result["answer"],
+    output: dict[str, object] = {
         "sources": result.get("sources", []),
+        "citations": result.get("citations", []),
         "retrieved_chunks": result.get("retrieved_chunks", 0),
     }
+    if _is_mixed(state):
+        output["knowledge_answer"] = result["answer"]
+    else:
+        output["answer"] = result["answer"]
+    return output
 
 
 def product_order_agent(
@@ -58,95 +121,102 @@ def product_order_agent(
     customer_id = context.get("customer_id")
 
     if db is None:
-        return {
-            "answer": (
-                "A database session is required to complete this request."
-            ),
-            "sources": [],
-            "retrieved_chunks": 0,
-        }
+        output: dict[str, object] = {}
+        error = "A database session is required to complete this request."
+        if _is_mixed(state):
+            output["product_order_answer"] = error
+        else:
+            output["answer"] = error
+            output["sources"] = []
+            output["retrieved_chunks"] = 0
+        return output
 
     # Customer identity comes from trusted application context.
     # Never infer it from the message or LLM-generated tool arguments.
-    answer = answer_with_tools(
-        message=state["question"],
+    question = state["question"]
+    if _is_mixed(state):
+        question = _support_question(question)
+    result = answer_with_tools(
+        message=question,
         db=db,
         trusted_customer_id=customer_id,
+        include_products=True,
     )
+    if not isinstance(result, dict):
+        raise RuntimeError("Product agent returned an invalid response")
+    answer = result.get("answer", "")
+    products = result.get("products", [])
 
-    return {
-        "answer": answer,
-        "sources": [],
-        "retrieved_chunks": 0,
-    }
+    output: dict[str, object] = {}
+    if _is_mixed(state):
+        output["product_order_answer"] = answer
+        output["products"] = products
+    else:
+        output["answer"] = answer
+        output["sources"] = []
+        output["retrieved_chunks"] = 0
+        output["products"] = products
+    return output
 
 
 def general_agent(state: SupportGraphState) -> dict:
-    """Generate a helpful response for general customer questions."""
-
-    if not GROQ_API_KEY:
-        return {
-            "answer": (
-                "The AI response service is not configured right now. "
-                "Please try again later."
-            ),
-            "sources": [],
-            "retrieved_chunks": 0,
-        }
-
-    llm = ChatGroq(
-        model=GROQ_MODEL,
-        temperature=0.3,
-        max_tokens=500,
-        api_key=GROQ_API_KEY,
-        timeout=30,
-        max_retries=1,
-    )
-
-    messages = [
-        SystemMessage(
-            content=(
-                "You are a friendly customer support assistant. "
-                "Answer greetings and general questions politely and "
-                "concisely. Do not invent product details, prices, "
-                "order information, company policies, or ticket status. "
-                "For information requiring a database lookup or company "
-                "policy, explain that you can help check the relevant "
-                "information instead of guessing."
-            )
-        ),
-        HumanMessage(content=state["question"]),
-    ]
-
-    try:
-        response = llm.invoke(messages)
-
-        if isinstance(response.content, str) and response.content.strip():
-            answer = response.content.strip()
-        else:
-            answer = (
-                "I'm sorry, I couldn't generate a response just now. "
-                "Please try again."
-            )
-
-    except Exception:
-        # Avoid exposing API keys, provider responses, or internal errors.
-        answer = (
-            "I'm having trouble responding right now. "
-            "Please try again in a moment."
-        )
-
+    """Respond to pleasantries without sending arbitrary text to an LLM."""
     return {
-        "answer": answer,
+        "answer": (
+            "Hello! I can help with products, orders, returns, refunds, "
+            "shipping, warranty, account help, and support tickets."
+        ),
         "sources": [],
         "retrieved_chunks": 0,
     }
 
 
-def choose_agent(state: SupportGraphState) -> str:
+def out_of_domain_agent(state: SupportGraphState) -> dict:
+    """Short-circuit unsupported and prompt-injection-style requests."""
+    return {
+        "answer": DOMAIN_REFUSAL,
+        "sources": [],
+        "citations": [],
+        "retrieved_chunks": 0,
+    }
+
+
+def assemble_mixed_response(state: SupportGraphState) -> dict:
+    """Combine policy evidence and product/order results for one response."""
+    parts = []
+    knowledge_answer = state.get("knowledge_answer", "").strip()
+    product_answer = state.get("product_order_answer", "").strip()
+
+    if knowledge_answer:
+        parts.append(f"Policy information: {knowledge_answer}")
+    if product_answer:
+        parts.append(f"Products and order support: {product_answer}")
+
+    return {
+        "answer": "\n\n".join(parts) or (
+            "I couldn't complete the combined request. Please try again."
+        )
+    }
+
+
+def choose_agent(state: SupportGraphState) -> Literal[
+    "knowledge", "product_order", "general", "mixed", "out_of_domain"
+]:
     """Return the next graph node based on the selected agent."""
 
     return state["selected_agent"]
+
+
+def continue_after_knowledge(
+    state: SupportGraphState,
+) -> Literal["product_order", "end"]:
+    return "product_order" if _is_mixed(state) else "end"
+
+
+def continue_after_product_order(
+    state: SupportGraphState,
+) -> Literal["assemble", "end"]:
+    return "assemble" if _is_mixed(state) else "end"
 
 
 def build_support_graph():
@@ -161,6 +231,8 @@ def build_support_graph():
     graph.add_node("knowledge", knowledge_agent)
     graph.add_node("product_order", product_order_agent)
     graph.add_node("general", general_agent)
+    graph.add_node("out_of_domain", out_of_domain_agent)
+    graph.add_node("assemble", assemble_mixed_response)
 
     graph.add_edge(START, "router")
 
@@ -171,12 +243,24 @@ def build_support_graph():
             "knowledge": "knowledge",
             "product_order": "product_order",
             "general": "general",
+            "mixed": "knowledge",
+            "out_of_domain": "out_of_domain",
         },
     )
 
-    graph.add_edge("knowledge", END)
-    graph.add_edge("product_order", END)
+    graph.add_conditional_edges(
+        "knowledge",
+        continue_after_knowledge,
+        {"product_order": "product_order", "end": END},
+    )
+    graph.add_conditional_edges(
+        "product_order",
+        continue_after_product_order,
+        {"assemble": "assemble", "end": END},
+    )
     graph.add_edge("general", END)
+    graph.add_edge("out_of_domain", END)
+    graph.add_edge("assemble", END)
 
     return graph.compile()
 

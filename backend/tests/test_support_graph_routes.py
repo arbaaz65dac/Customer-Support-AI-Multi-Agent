@@ -57,10 +57,11 @@ def test_support_graph_endpoint_returns_graph_result(
 ):
     """Test the endpoint without invoking the real LLM."""
 
-    def fake_invoke(state, context):
+    def fake_invoke(state, context, config):
         assert state["question"] == "What is the refund policy?"
         assert "db" in context
         assert context["customer_id"] == 123
+        assert config["recursion_limit"] == 6
 
         return {
             "question": state["question"],
@@ -68,6 +69,8 @@ def test_support_graph_endpoint_returns_graph_result(
             "selected_agent": "knowledge",
             "answer": "The policy does not specify a refund timeline.",
             "sources": ["returns_refunds_policy.md"],
+            "citations": [],
+            "products": [],
             "retrieved_chunks": 2,
         }
 
@@ -119,7 +122,7 @@ def test_support_graph_endpoint_handles_runtime_failure(
     authenticated_client,
     monkeypatch,
 ):
-    def fail_invoke(state, context):
+    def fail_invoke(state, context, config):
         raise RuntimeError("Simulated provider failure")
 
     monkeypatch.setattr(

@@ -1,7 +1,10 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 
 from app.schemas.rag import RAGRequest, RAGResponse
 from app.services.rag_service import answer_from_knowledge
+from app.core.structured_logging import log_event
 
 
 router = APIRouter(
@@ -26,7 +29,11 @@ def ask_knowledge_base(request: RAGRequest):
 
     except RuntimeError as exc:
         # Keep internal configuration details out of the HTTP response.
-        print(f"RAG service runtime error: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=503,
@@ -34,7 +41,11 @@ def ask_knowledge_base(request: RAGRequest):
         ) from exc
 
     except Exception as exc:
-        print(f"RAG request failed: {type(exc).__name__}")
+        log_event(
+            logging.ERROR,
+            "provider_error",
+            error_type=type(exc).__name__,
+        )
 
         raise HTTPException(
             status_code=502,

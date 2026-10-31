@@ -101,6 +101,72 @@ def test_search_products_by_query(product_test_client):
     assert products[0]["name"] == "Wireless Mouse"
 
 
+def test_search_products_matches_all_words_across_description(product_test_client):
+    response = product_test_client.post(
+        "/api/products",
+        json={
+            "name": "Bluetooth Headphones",
+            "description": "Wireless over-ear audio with cushioned ear cups.",
+            "category": "Audio",
+            "price": "1999.00",
+            "stock": 7,
+            "active": True,
+        },
+    )
+    assert response.status_code == 201
+
+    results = product_test_client.get(
+        "/api/products",
+        params={"query": "wireless headphones"},
+    )
+    assert results.status_code == 200
+    assert [product["name"] for product in results.json()] == [
+        "Bluetooth Headphones"
+    ]
+
+
+def test_search_products_by_price_range(product_test_client):
+    for name, price in [
+        ("Budget Headphones", "1500.00"),
+        ("Premium Headphones", "3500.00"),
+    ]:
+        response = product_test_client.post(
+            "/api/products",
+            json={
+                "name": name,
+                "description": "Headphone product for filter test.",
+                "category": "Audio",
+                "price": price,
+                "stock": 5,
+                "active": True,
+            },
+        )
+        assert response.status_code == 201
+
+    response = product_test_client.get(
+        "/api/products",
+        params={
+            "category": "Audio",
+            "min_price": "2000",
+            "max_price": "4000",
+        },
+    )
+
+    assert response.status_code == 200
+    assert [product["name"] for product in response.json()] == [
+        "Premium Headphones"
+    ]
+
+
+def test_search_products_rejects_reversed_price_range(product_test_client):
+    response = product_test_client.get(
+        "/api/products",
+        params={"min_price": "2000", "max_price": "1000"},
+    )
+
+    assert response.status_code == 422
+
+
 def test_negative_price_is_rejected(product_test_client):
     response = product_test_client.post(
         "/api/products",
@@ -177,3 +243,29 @@ def test_product_creation_requires_authentication(client):
     )
 
     assert response.status_code == 401
+
+
+def test_product_categories_and_admin_inventory_include_inactive_products(
+    product_test_client,
+):
+    created = product_test_client.post(
+        "/api/products",
+        json={
+            "name": "Inactive catalogue item",
+            "description": "Admin inventory test",
+            "category": "Accessories",
+            "price": "99.00",
+            "stock": 2,
+            "active": True,
+        },
+    )
+    assert created.status_code == 201
+    product_id = created.json()["id"]
+    assert product_test_client.get("/api/products/categories").json() == [
+        "Accessories"
+    ]
+
+    product_test_client.delete(f"/api/products/{product_id}")
+    inventory = product_test_client.get("/api/products/admin/all")
+    assert inventory.status_code == 200
+    assert inventory.json()[0]["active"] is False

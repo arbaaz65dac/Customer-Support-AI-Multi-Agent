@@ -23,10 +23,13 @@ class Order(Base):
         ForeignKey("customers.id"), nullable=False, index=True
     )
     status: Mapped[str] = mapped_column(
-        String(30), default="pending", nullable=False
+        String(30), default="pending", index=True, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, server_default=func.now(), nullable=False
+        DateTime, server_default=func.now(), index=True, nullable=False
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
     )
 
     customer: Mapped["Customer"] = relationship(back_populates="orders")
@@ -51,3 +54,7 @@ class OrderItem(Base):
 
     order: Mapped["Order"] = relationship(back_populates="items")
     product: Mapped["Product"] = relationship(back_populates="order_items")
+
+    @property
+    def product_name(self) -> str | None:
+        return self.product.name if self.product is not None else None

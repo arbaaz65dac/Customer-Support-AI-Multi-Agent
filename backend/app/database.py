@@ -14,17 +14,18 @@ DB_NAME = os.getenv("DB_NAME", "customer_support_ai")
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 
-# Build the connection URL safely.
-# URL.create handles special characters in passwords.
-DATABASE_URL = URL.create(
-    drivername="mysql+pymysql",
-    username=DB_USER,
-    password=DB_PASSWORD,
-    host=DB_HOST,
-    port=DB_PORT,
-    database=DB_NAME,
-    query={"charset": "utf8mb4"},
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    # URL.create safely handles special characters in MySQL passwords.
+    DATABASE_URL = URL.create(
+        drivername="mysql+pymysql",
+        username=DB_USER,
+        password=DB_PASSWORD,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+        query={"charset": "utf8mb4"},
+    )
 
 # Create the SQLAlchemy engine.
 # pool_pre_ping checks connections before reusing them.

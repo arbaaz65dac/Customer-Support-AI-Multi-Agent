@@ -4,30 +4,21 @@ from pathlib import Path
 import math
 
 from langchain_chroma import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
-
-from app.core.config import GOOGLE_API_KEY, GEMINI_EMBEDDING_MODEL
 from app.services.document_service import load_and_split_documents
 from app.core.config import RAG_TOP_K, RAG_MAX_DISTANCE
+from app.services.provider_service import create_gemini_embeddings
 
 
 # Store the local vector database inside backend/data/chroma.
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 CHROMA_DIR = BACKEND_DIR / "data" / "chroma"
 
-COLLECTION_NAME = "customer_support_knowledge"
+COLLECTION_NAME = "customer_support_knowledge_v1"
 
 
 def create_embeddings():
     """Create the Gemini embedding model."""
-
-    if not GOOGLE_API_KEY:
-        raise RuntimeError("GOOGLE_API_KEY is not configured")
-
-    return GoogleGenerativeAIEmbeddings(
-        model=GEMINI_EMBEDDING_MODEL,
-        google_api_key=GOOGLE_API_KEY,
-    )
+    return create_gemini_embeddings()
 
 
 def create_vector_store():
@@ -73,10 +64,26 @@ def index_knowledge_documents() -> int:
 
     vector_store = create_vector_store()
 
+    policies = list(
+        {
+            chunk.metadata.get("policy", "unknown")
+            for chunk in chunks
+        }
+    )
+    existing = vector_store.get(
+        where={"policy": {"$in": policies}},
+        include=[],
+    )
+    existing_ids = set(existing.get("ids", []))
+
     # Keep IDs stable across repeated indexing of unchanged chunks.
     ids = [
         _make_chunk_id(
-            source=chunk.metadata.get("source", "unknown"),
+            source=(
+                f"{chunk.metadata.get('source', 'unknown')}|"
+                f"{chunk.metadata.get('version', 'unknown')}|"
+                f"{chunk.metadata.get('effective_date', 'unknown')}"
+            ),
             start_index=chunk.metadata.get("start_index", 0),
             content=chunk.page_content,
         )
@@ -89,17 +96,15 @@ def index_knowledge_documents() -> int:
         documents=chunks,
         ids=ids,
     )
+    stale_ids = existing_ids.difference(ids)
+    if stale_ids:
+        vector_store.delete(ids=sorted(stale_ids))
 
     return len(chunks)
 
 
 def search_knowledge(query: str, k: int = 3):
-    """
-    Search for the most relevant document chunks.
-
-    This function is for development checks today.
-    We'll connect it to the assistant in a later phase.
-    """
+    """Search indexed policy chunks for a development or support query."""
 
     if not query or not query.strip():
         raise ValueError("Search query cannot be empty")

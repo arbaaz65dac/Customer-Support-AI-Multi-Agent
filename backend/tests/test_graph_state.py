@@ -28,8 +28,18 @@ def test_graph_state_accepts_rag_response_metadata():
         "selected_agent": "knowledge",
         "answer": "Please refer to the delivery policy.",
         "sources": ["delivery_policy.md"],
+        "citations": [
+            {
+                "source": "delivery_policy.md",
+                "policy": "shipping_policy",
+                "version": "1.0",
+                "effective_date": "2026-10-31",
+                "excerpt": "Delivery timing",
+            }
+        ],
         "retrieved_chunks": 2,
     }
 
     assert state["sources"] == ["delivery_policy.md"]
+    assert state["citations"][0]["policy"] == "shipping_policy"
     assert state["retrieved_chunks"] == 2

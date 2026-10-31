@@ -130,6 +130,69 @@ def test_customer_cannot_choose_ticket_owner(client):
     assert response.json()["customer_id"] == customer_id
 
 
+def test_ticket_can_reference_only_an_order_owned_by_customer(client):
+    from app.models import Product
+
+    customer_id = create_test_customer(client)
+    owner_token = login_test_customer(client)
+    second = client.post(
+        "/api/customers",
+        json={
+            "name": "Second Ticket Customer",
+            "email": "ticket-other@example.com",
+            "password": "DemoPassword123!",
+        },
+    )
+    second_login = client.post(
+        "/api/auth/login",
+        json={
+            "email": "ticket-other@example.com",
+            "password": "DemoPassword123!",
+        },
+    )
+    db_generator = app.dependency_overrides[get_db]()
+    db = next(db_generator)
+    product = Product(
+        name="Ticket order product",
+        description="Product for ticket order ownership.",
+        category="Testing",
+        price="100.00",
+        stock=2,
+        active=True,
+    )
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    product_id = product.id
+    db_generator.close()
+
+    order = client.post(
+        "/api/orders",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json={"customer_id": customer_id, "items": [{"product_id": product_id, "quantity": 1}]},
+    )
+    assert order.status_code == 201
+    ticket_data = {
+        "subject": "Order problem",
+        "description": "The package arrived with an issue.",
+        "order_id": order.json()["id"],
+    }
+    own_ticket = client.post(
+        "/api/support-tickets",
+        headers={"Authorization": f"Bearer {owner_token}"},
+        json=ticket_data,
+    )
+    foreign_ticket = client.post(
+        "/api/support-tickets",
+        headers={"Authorization": f"Bearer {second_login.json()['access_token']}"},
+        json=ticket_data,
+    )
+    assert own_ticket.status_code == 201
+    assert own_ticket.json()["order_id"] == order.json()["id"]
+    assert foreign_ticket.status_code == 404
+    assert second.status_code == 201
+
+
 def test_admin_ticket_listing_rejects_unauthenticated_request(client):
     """The admin ticket listing requires authentication."""
 

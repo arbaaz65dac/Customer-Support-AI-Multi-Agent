@@ -135,6 +135,9 @@ def test_admin_dashboard_returns_ticket_counts(client):
         "open_tickets": 1,
         "in_progress_tickets": 1,
         "resolved_tickets": 1,
+        "total_customers": 1,
+        "total_orders": 0,
+        "revenue": 0.0,
     }
 
 
@@ -155,4 +158,7 @@ def test_empty_dashboard_returns_zero_counts(client):
         "open_tickets": 0,
         "in_progress_tickets": 0,
         "resolved_tickets": 0,
+        "total_customers": 0,
+        "total_orders": 0,
+        "revenue": 0.0,
     }

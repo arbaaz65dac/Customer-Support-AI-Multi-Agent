@@ -1,8 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_groq import ChatGroq
-
-from app.core.config import GROQ_API_KEY, GROQ_MODEL
+from app.core.config import GROQ_API_KEY
 from app.schemas.chat import ChatAssistantResponse
+from app.services.provider_service import create_groq_chat_model
 
 
 def generate_structured_answer(message: str) -> ChatAssistantResponse:
@@ -50,14 +49,7 @@ def generate_structured_answer(message: str) -> ChatAssistantResponse:
     )
 
     # Configure the model.
-    llm = ChatGroq(
-        model=GROQ_MODEL,
-        temperature=0,
-        max_tokens=500,
-        api_key=GROQ_API_KEY,
-        timeout=30,
-        max_retries=1,
-    )
+    llm = create_groq_chat_model()
 
     # Ask LangChain to parse the response into our Pydantic schema.
     # The returned value should be a ChatAssistantResponse instance.

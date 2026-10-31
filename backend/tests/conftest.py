@@ -8,6 +8,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import Base, get_db
 from app.main import app
+from app.core.rate_limit import auth_rate_limiter, chat_rate_limiter
 
 # Register every SQLAlchemy model before creating the test schema.
 from app import models  # noqa: F401
@@ -15,6 +16,9 @@ from app import models  # noqa: F401
 
 @pytest.fixture()
 def client():
+    auth_rate_limiter.reset()
+    chat_rate_limiter.reset()
+
     # Create an in-memory SQLite database for this test.
     test_engine = create_engine(
         "sqlite://",
@@ -45,6 +49,8 @@ def client():
         yield test_client
 
     app.dependency_overrides.clear()
+    auth_rate_limiter.reset()
+    chat_rate_limiter.reset()
     Base.metadata.drop_all(bind=test_engine)
     test_engine.dispose()
 

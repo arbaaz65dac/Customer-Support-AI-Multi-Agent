@@ -31,6 +31,9 @@ def authenticate_customer(
     if customer is None:
         return None
 
+    if not customer.active:
+        return None
+
     if not password_hasher.verify(password, customer.password_hash):
         return None
 

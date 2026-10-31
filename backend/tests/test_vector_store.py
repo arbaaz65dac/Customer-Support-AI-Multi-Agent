@@ -93,3 +93,55 @@ def test_chroma_returns_empty_list_for_empty_collection(tmp_path):
     results = store.similarity_search("unknown question", k=3)
 
     assert results == []
+
+
+def test_index_replaces_stale_chunks_after_successful_upsert(monkeypatch):
+    from app.services import vector_store_service
+
+    documents = [
+        Document(
+            page_content="Return requests can be made within seven days.",
+            metadata={
+                "source": "returns_policy_v1.md",
+                "policy": "returns_policy",
+                "version": "1.0",
+                "effective_date": "2026-10-31",
+                "start_index": 0,
+            },
+        )
+    ]
+
+    class FakeVectorStore:
+        def __init__(self):
+            self.deleted_ids = []
+            self.added_ids = []
+
+        def get(self, where, include):
+            assert where == {"policy": {"$in": ["returns_policy"]}}
+            assert include == []
+            return {"ids": ["stale-policy-chunk"]}
+
+        def add_documents(self, documents, ids):
+            self.added_ids = ids
+            assert len(documents) == 1
+
+        def delete(self, ids):
+            self.deleted_ids = ids
+
+    store = FakeVectorStore()
+    monkeypatch.setattr(
+        vector_store_service,
+        "load_and_split_documents",
+        lambda: documents,
+    )
+    monkeypatch.setattr(
+        vector_store_service,
+        "create_vector_store",
+        lambda: store,
+    )
+
+    indexed_count = vector_store_service.index_knowledge_documents()
+
+    assert indexed_count == 1
+    assert len(store.added_ids) == 1
+    assert store.deleted_ids == ["stale-policy-chunk"]

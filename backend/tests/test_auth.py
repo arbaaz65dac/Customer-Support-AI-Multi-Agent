@@ -53,6 +53,7 @@ def test_login_returns_access_token(client, registered_customer):
     assert isinstance(data["access_token"], str)
     assert data["access_token"]
     assert data["expires_in"] > 0
+    assert data["role"] == "customer"
 
     assert (
         decode_access_token(data["access_token"])
@@ -120,6 +121,53 @@ def test_support_endpoint_rejects_request_without_token(client):
     assert response.status_code == 401
 
 
+def test_customer_profile_includes_authenticated_role(
+    client,
+    registered_customer,
+):
+    login = client.post(
+        "/api/auth/login",
+        json={
+            "email": registered_customer["email"],
+            "password": "CorrectPassword123!",
+        },
+    )
+    profile = client.get(
+        f"/api/customers/{registered_customer['id']}",
+        headers={"Authorization": f"Bearer {login.json()['access_token']}"},
+    )
+    assert profile.status_code == 200
+    assert profile.json()["role"] == "customer"
+
+
+def test_admin_login_returns_admin_role(client):
+    from pwdlib import PasswordHash
+
+    from app.database import get_db
+
+    db_generator = app.dependency_overrides[get_db]()
+    db = next(db_generator)
+    admin = Customer(
+        name="Role Test Admin",
+        email="role-test-admin@example.com",
+        password_hash=PasswordHash.recommended().hash("RoleTestPassword123!"),
+        role="admin",
+    )
+    db.add(admin)
+    db.commit()
+    db_generator.close()
+
+    response = client.post(
+        "/api/auth/login",
+        json={
+            "email": "role-test-admin@example.com",
+            "password": "RoleTestPassword123!",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["role"] == "admin"
+
+
 def test_support_endpoint_accepts_valid_customer_token(
     client,
     registered_customer,
@@ -136,8 +184,9 @@ def test_support_endpoint_accepts_valid_customer_token(
     assert login_response.status_code == 200
     token = login_response.json()["access_token"]
 
-    def fake_invoke(state, context):
+    def fake_invoke(state, context, config):
         assert context["customer_id"] == registered_customer["id"]
+        assert config["recursion_limit"] == 6
 
         return {
             "question": state["question"],

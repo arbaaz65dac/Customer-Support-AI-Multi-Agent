@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from typing import Literal
+
 
 # Input schema: accepts a password only during registration.
 class CustomerCreate(BaseModel):
@@ -15,3 +17,13 @@ class CustomerResponse(BaseModel):
     id: int
     name: str
     email: EmailStr
+    role: Literal["admin", "customer"] = "customer"
+
+
+class AdminCustomerResponse(CustomerResponse):
+    role: Literal["admin", "customer"]
+    active: bool
+
+
+class CustomerActiveUpdate(BaseModel):
+    active: bool

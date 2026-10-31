@@ -7,11 +7,14 @@ from app.services import vector_store_service
 def test_retrieval_keeps_candidates_within_threshold(monkeypatch):
     relevant_doc = Document(
         page_content="Delayed deliveries should be investigated.",
-        metadata={"source": "delivery_policy.md"},
+        metadata={
+            "source": "shipping_policy_v1.md",
+            "version": "1.0",
+        },
     )
     weak_doc = Document(
         page_content="Unrelated catalogue information.",
-        metadata={"source": "faq.md"},
+        metadata={"source": "faq_v1.md"},
     )
 
     # Simulate Chroma results with one close match and one distant match.
@@ -40,7 +43,7 @@ def test_retrieval_keeps_candidates_within_threshold(monkeypatch):
 
     assert len(results) == 1
     assert results[0]["document"].metadata["source"] == (
-        "delivery_policy.md"
+        "shipping_policy_v1.md"
     )
     assert results[0]["distance"] == 0.4
 
@@ -50,7 +53,7 @@ def test_retrieval_returns_empty_when_all_candidates_are_weak(
 ):
     weak_doc = Document(
         page_content="Unrelated content.",
-        metadata={"source": "faq.md"},
+        metadata={"source": "faq_v1.md"},
     )
 
     class FakeVectorStore:

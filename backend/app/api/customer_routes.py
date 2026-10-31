@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pwdlib import PasswordHash
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -8,7 +8,14 @@ from sqlalchemy.orm import Session
 from app.core.security import get_current_customer
 from app.database import get_db
 from app.models import Customer
-from app.schemas.customer import CustomerCreate, CustomerResponse
+from app.schemas.customer import (
+    AdminCustomerResponse,
+    CustomerActiveUpdate,
+    CustomerCreate,
+    CustomerResponse,
+)
+from app.core.security import require_admin
+from app.core.rate_limit import auth_rate_limiter
 
 
 router = APIRouter(
@@ -26,9 +33,13 @@ password_hasher = PasswordHash.recommended()
 )
 def create_customer(
     customer_data: CustomerCreate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     """Register a customer without storing their plain-text password."""
+
+    client_ip = request.client.host if request.client else "unknown"
+    auth_rate_limiter.check(f"ip:{client_ip}")
 
     existing = db.scalar(
         select(Customer).where(
@@ -62,6 +73,62 @@ def create_customer(
             detail="A customer with this email already exists",
         )
 
+    return customer
+
+
+@router.get(
+    "/admin/all",
+    response_model=list[AdminCustomerResponse],
+)
+def list_customers(
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+    admin_customer: Customer = Depends(require_admin),
+):
+    return db.scalars(
+        select(Customer)
+        .order_by(Customer.id)
+        .offset(offset)
+        .limit(limit)
+    ).all()
+
+
+@router.get(
+    "/admin/{customer_id}",
+    response_model=AdminCustomerResponse,
+)
+def get_admin_customer(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    admin_customer: Customer = Depends(require_admin),
+):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    return customer
+
+
+@router.patch(
+    "/admin/{customer_id}/active",
+    response_model=AdminCustomerResponse,
+)
+def update_customer_active(
+    customer_id: int,
+    active_data: CustomerActiveUpdate,
+    db: Session = Depends(get_db),
+    admin_customer: Customer = Depends(require_admin),
+):
+    customer = db.get(Customer, customer_id)
+    if customer is None:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    if customer.id == admin_customer.id and not active_data.active:
+        raise HTTPException(
+            status_code=400, detail="Administrators cannot deactivate themselves."
+        )
+    customer.active = active_data.active
+    db.commit()
+    db.refresh(customer)
     return customer
 
 

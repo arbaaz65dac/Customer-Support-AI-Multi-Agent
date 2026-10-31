@@ -1,7 +1,8 @@
 
 from decimal import Decimal
+import re
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Product
@@ -11,6 +12,7 @@ def search_products(
     db: Session,
     query: str | None = None,
     category: str | None = None,
+    min_price: Decimal | None = None,
     max_price: Decimal | None = None,
     limit: int = 20,
     offset: int = 0,
@@ -24,12 +26,17 @@ def search_products(
     statement = select(Product).where(Product.active.is_(True))
 
     if query and query.strip():
-        # Search product names and descriptions.
-        term = f"%{query.strip()}%"
-        statement = statement.where(
-            Product.name.ilike(term)
-            | Product.description.ilike(term)
-        )
+        # Match every useful query word, even when words are not adjacent in
+        # the product description (for example, "wireless headphones").
+        terms = re.findall(r"[\w]+", query.strip(), flags=re.UNICODE)
+        for word in terms:
+            term = f"%{word}%"
+            statement = statement.where(
+                or_(
+                    Product.name.ilike(term),
+                    Product.description.ilike(term),
+                )
+            )
 
     if category and category.strip():
         statement = statement.where(
@@ -38,6 +45,9 @@ def search_products(
 
     if max_price is not None:
         statement = statement.where(Product.price <= max_price)
+
+    if min_price is not None:
+        statement = statement.where(Product.price >= min_price)
 
     statement = (
         statement
