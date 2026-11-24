@@ -1,127 +1,118 @@
-# SupportSphere
-
-An e-commerce support application with role-based workflows and a policy-grounded, multi-agent assistant.
-
+<div align="center">
+# 🛍️ SupportSphere
+ 
+### E-commerce customer support with role-based workflows and a policy-grounded, multi-agent AI assistant
+ 
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![MySQL](https://img.shields.io/badge/MySQL-database-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-agents-1C3C3C)](https://langchain-ai.github.io/langgraph/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](./LICENSE)
-
-## 1. Overview
-
-Online stores commonly split product discovery, order tracking, policy questions, and support requests across separate workflows.
-SupportSphere brings those customer tasks into one React application backed by FastAPI and MySQL.
-Its LangGraph assistant routes in-domain questions to controlled business tools or a policy retrieval workflow.
-The assistant uses Groq for chat generation and ChromaDB with Gemini embeddings for policy retrieval.
-It is a local/demo project; provider behavior, live deployment, and production load have not been measured.
-
-### 30-second pitch
-
-- Customers can browse products, check their own orders, create support tickets, and track return/refund requests.
-- Admins can manage customers, products, orders, tickets, and refund-request reviews.
-- A bounded LangGraph routes product/order support, policy, mixed, and out-of-domain requests.
-- Business tools use validated SQLAlchemy operations and authenticated customer context rather than model-generated SQL.
-- Policy answers use retrieved, versioned documents and return source citations.
-
-## 2. Table of contents
-
-- [Demo](#3-demo)
-- [Features](#4-features)
-- [Architecture](#5-architecture)
-- [Tech stack](#6-tech-stack)
-- [Database design](#7-database-design)
-- [AI design decisions](#8-ai-design-decisions)
-- [Project structure](#9-project-structure)
-- [Quick start](#10-quick-start)
-- [Environment variables](#11-environment-variables)
-- [Development-only demo accounts](#12-development-only-demo-accounts)
-- [API reference](#13-api-reference)
-- [Testing and evaluation](#14-testing-and-evaluation)
-- [Security](#15-security)
-- [Limitations and known issues](#16-limitations-and-known-issues)
-- [Future improvements](#17-future-improvements)
-- [Troubleshooting](#18-troubleshooting)
-- [Contributing, license, and author](#19-contributing-license-and-author)
-- [Needs my verification](#20-needs-my-verification)
-
-## 3. Demo
-
-- **Live application:** [Not deployed — add URL]
-- **Demo video:** [Not recorded — add video link]
-
-Screenshots are placeholders; the image files are not included yet. Add screenshots at these paths and replace the links:
-
-| Screenshot | Caption |
-|---|---|
-| [docs/screenshots/login.png](docs/screenshots/login.png) | Login and account creation |
-| [docs/screenshots/products.png](docs/screenshots/products.png) | Product search and filters |
-| [docs/screenshots/chat-citations.png](docs/screenshots/chat-citations.png) | Assistant response with policy citations |
-| [docs/screenshots/admin-dashboard.png](docs/screenshots/admin-dashboard.png) | Admin overview and navigation |
-| [docs/screenshots/tickets.png](docs/screenshots/tickets.png) | Customer ticket list and details |
-
-The following are illustrative conversations showing the kinds of requests and response fields supported. They are examples, not captured provider output; exact wording and returned data depend on the database, indexed policy set, and model response.
-
-**Product query**
-
-> **Customer:** Find wireless headphones under ₹3000.
-> **Assistant:** I found matching products.
-> **Product card:** AeroTune Wireless Headphones · ₹2799.00 · stock shown from the catalogue.
-
-**Policy query with citation**
-
-> **Customer:** What is the return window?
-> **Assistant:** I can answer from the current returns policy.
-> **Citation:** `returns_policy_v1.md` · version and effective date are returned with the cited excerpt.
-
-**Mixed query**
-
-> **Customer:** Can I return my order? Also show wireless headphones under ₹3000.
-> **Assistant:** The policy response and catalogue results are combined; the answer includes policy citations and structured product cards when available.
-
-**Refund request**
-
-> **Customer:** I want a refund for order 123 because the item arrived damaged.
-> **Assistant:** The assistant may ask for missing details. A request is accepted only when the authenticated customer owns an eligible delivered order within the configured policy window. The request is tracked for admin review; no payment is executed.
-
-**Out-of-domain refusal**
-
-> **Customer:** Who won yesterday's match?
-> **Assistant:** Sorry, that's outside my domain. I can help with products, orders, returns, refunds, shipping, warranty, account help, and support tickets.
-
-## 4. Features
-
-### Customer
-
-- Sign up and log in; new signups receive the customer role.
-- Browse and search active products by category and price, with pagination and product details.
-- View personal orders and order items.
-- Create tickets, read ticket details, and reply in a ticket conversation.
-- Create and track return/refund requests for eligible orders.
-- Use the assistant for supported product, order, ticket, and policy questions.
-
-### Admin
-
-- View dashboard counts for customers, orders, tickets, and recorded order-item totals.
-- List customer profiles and activate or deactivate customer accounts.
-- Create, edit, list, and deactivate products.
-- View all orders and update order status.
-- Filter tickets and update status, priority, and assignment; view and reply to tickets.
-- Review pending refund requests by approving or rejecting them. This records a decision only; it does not issue a payment.
-
-### AI assistant
-
-- Routes supported requests to product/order tools, policy retrieval, or both for mixed requests.
-- Returns structured product results and policy citations when evidence is retrieved.
-- Refuses out-of-domain requests before retrieval or business tools run.
-- Detects common prompt-injection attempts (for example, requests to ignore prior instructions or reveal the system prompt) and short-circuits them.
-- Uses authenticated backend context for customer-specific operations; it does not take customer identity from the prompt.
-
-## 5. Architecture
-
-### System
-
+[![ChromaDB](https://img.shields.io/badge/ChromaDB-RAG-orange)](https://www.trychroma.com/)
+ 
+### 🚀 [Live demo on Railway](https://ai-customer-support-production-3b00.up.railway.app/)
+ 
+</div>
+---
+ 
+## Table of contents
+ 
+- [Overview](#overview)
+- [Key features](#key-features)
+- [Live demo](#live-demo)
+- [Architecture](#architecture)
+- [Tech stack](#tech-stack)
+- [Database design](#database-design)
+- [AI design decisions](#ai-design-decisions)
+- [Project structure](#project-structure)
+- [Getting started](#getting-started)
+- [Deployment (Railway)](#deployment-railway)
+- [Environment variables](#environment-variables)
+- [Demo accounts](#demo-accounts)
+- [API reference](#api-reference)
+- [Testing and evaluation](#testing-and-evaluation)
+- [Security](#security)
+- [Limitations](#limitations)
+- [Roadmap](#roadmap)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [Author](#author)
+---
+ 
+## Overview
+ 
+Online stores usually split product discovery, order tracking, policy questions and support requests across separate tools. **SupportSphere** brings all of these into one React application backed by **FastAPI** and **MySQL**.
+ 
+At its core is a **LangGraph** assistant that routes each question to the right place:
+ 
+- product, order, ticket and refund questions go to **controlled business tools**,
+- policy questions go to a **retrieval (RAG) workflow** that returns citations,
+- mixed questions use both,
+- out-of-domain and prompt-injection attempts get a **deterministic refusal** before any tool or retrieval runs.
+Chat generation uses **Groq**; policy retrieval uses **ChromaDB** with **Gemini embeddings**.
+ 
+> **Note:** This is a demo project. It is deployed on Railway, but provider behaviour and production load have not been measured.
+ 
+### At a glance
+ 
+- **Customers** browse products, check their own orders, open support tickets, and track return/refund requests.
+- **Admins** manage customers, products, orders, tickets and refund reviews.
+- **The assistant** is a bounded LangGraph workflow, not a free-roaming agent.
+- **Business tools** use validated SQLAlchemy operations and authenticated customer context. The model never writes SQL.
+- **Policy answers** come from retrieved, versioned documents and include source citations.
+---
+ 
+## Key features
+ 
+### 👤 Customer
+ 
+- Sign up and log in (new signups get the customer role)
+- Browse and search active products by keyword, category and price, with pagination and detail pages
+- View personal orders and their items
+- Create support tickets, read details and reply in the ticket conversation
+- Create and track return/refund requests for eligible orders
+- Ask the assistant about products, orders, tickets and policies
+### 🛠️ Admin
+ 
+- Dashboard counts for customers, orders, tickets and recorded order-item totals
+- List customers and activate/deactivate accounts
+- Create, edit, list and deactivate products
+- View all orders and update order status
+- Filter tickets, update status/priority/assignment, view and reply
+- Approve or reject pending refund requests (records a decision only, **no payment is executed**)
+### 🤖 AI assistant
+ 
+- Intent routing: product/order, policy, mixed, greeting, out-of-domain
+- Structured product cards and policy citations in responses
+- Refuses out-of-domain requests before retrieval or tools run
+- Detects common prompt-injection attempts (e.g. "ignore previous instructions", "reveal the system prompt") and short-circuits them
+- Customer identity comes from the signed token, never from the prompt
+---
+ 
+## Live demo
+ 
+**Try it here: [https://ai-customer-support-production-3b00.up.railway.app/](https://ai-customer-support-production-3b00.up.railway.app/)**
+ 
+The app is deployed on [Railway](https://railway.com/). It is a demo deployment, so first load may be slow if the service has been idle, and assistant answers depend on the configured Groq and Gemini provider keys and quotas.
+ 
+### Example conversations
+ 
+The following are illustrative. Exact wording depends on the database, indexed policies and model response.
+ 
+| Scenario | Customer says | Assistant behaviour |
+| --- | --- | --- |
+| Product query | "Find wireless headphones under ₹3000." | Returns matching product cards with price and stock from the catalogue. |
+| Policy query | "What is the return window?" | Answers from the returns policy and returns a citation (e.g. `returns_policy_v1.md`) with version and effective date. |
+| Mixed query | "Can I return my order? Also show wireless headphones under ₹3000." | Combines the policy answer (with citations) and product results. |
+| Refund request | "I want a refund for order 123, it arrived damaged." | May ask for missing details. A request is accepted only if the authenticated customer owns an eligible delivered order within the policy window. Tracked for admin review. |
+| Out of domain | "Who won yesterday's match?" | Polite refusal listing supported topics (products, orders, returns, refunds, shipping, warranty, account help, tickets). |
+ 
+---
+ 
+## Architecture
+ 
+### System overview
+ 
 ```mermaid
 flowchart LR
     Browser["React + Vite"]
@@ -137,7 +128,7 @@ flowchart LR
     Policies["Versioned policy Markdown"]
     Groq["Groq chat model"]
     Gemini["Gemini embeddings"]
-
+ 
     Browser -->|"HTTPS/JSON + bearer token"| API
     API --> ORM
     ORM --> MySQL
@@ -156,9 +147,9 @@ flowchart LR
     Assembly --> API
     API --> Browser
 ```
-
+ 
 ### LangGraph workflow
-
+ 
 ```mermaid
 flowchart TD
     Start([Start]) --> Router["Router: classify intent"]
@@ -175,37 +166,40 @@ flowchart TD
     Router -->|"greeting"| General["Greeting response"]
     General --> End
 ```
-
+ 
+The router is deterministic and pattern-based. The authenticated support route applies a `MAX_GRAPH_STEPS` recursion limit. A `mixed` request runs the knowledge path, then the product/order path, then response assembly.
+ 
 ### Request lifecycle
-
-1. The browser sends a JSON request to FastAPI; authenticated requests include the bearer access token.
-2. FastAPI validates the request, resolves the user from the token, applies role/ownership checks, and assigns a request ID.
-3. For assistant messages, the router classifies intent before selecting any agent.
-4. Out-of-domain and recognized injection requests return a deterministic refusal without calling tools or policy retrieval.
-5. In-domain business operations use validated tools backed by SQLAlchemy; policy requests retrieve relevant chunks from ChromaDB.
-6. Mixed requests combine the policy and business-agent results; the API returns answer text plus structured citations/products where applicable.
-7. Structured logs contain allowlisted operational fields and the request ID, not full user messages or credentials.
-
-See [docs/architecture.md](docs/architecture.md) for additional component and trust-boundary details.
-
-## 6. Tech stack
-
+ 
+1. The browser sends JSON to FastAPI; authenticated requests carry the bearer token.
+2. FastAPI validates the request, resolves the user from the token, applies role/ownership checks and assigns a request ID.
+3. For assistant messages, the router classifies intent **before** selecting any agent.
+4. Out-of-domain and recognized injection requests return a refusal without touching tools or retrieval.
+5. In-domain business operations use validated tools backed by SQLAlchemy; policy requests retrieve chunks from ChromaDB.
+6. Mixed requests merge the policy and business results; the API returns answer text plus structured citations/products.
+7. Structured logs contain allow-listed operational fields and the request ID, never full user messages or credentials.
+More detail, including component-to-file mapping and trust boundaries, is in [`docs/architecture.md`](docs/architecture.md).
+ 
+---
+ 
+## Tech stack
+ 
 | Layer | Technology | Purpose |
-|---|---|---|
-| Web UI | React 19, Vite 8, React Router | Customer/admin interface and client-side navigation |
-| API | Python 3.13, FastAPI, Pydantic | HTTP endpoints, validation, dependency-based authorization |
-| Persistence | MySQL, SQLAlchemy 2 | Relational customer, catalogue, order, ticket, conversation, and refund data |
-| Schema changes | Alembic | Versioned database migrations |
-| Workflow orchestration | LangGraph | Bounded intent routing and agent workflow |
-| Chat model | Groq through `langchain-groq` | Assistant response generation |
-| Knowledge retrieval | ChromaDB, Gemini embeddings | Vector search over versioned support policies |
-| Tests | Pytest; Vitest, React Testing Library | Backend and frontend verification |
-| Lint/build | oxlint; Vite | Frontend lint and production bundle |
-
-## 7. Database design
-
-The application models are relational SQLAlchemy tables. `alembic_version` is maintained by Alembic to record migration state; it is not a business entity.
-
+| --- | --- | --- |
+| Web UI | React 19, Vite, React Router | Customer/admin interface and client-side routing |
+| API | Python 3.13, FastAPI, Pydantic | Endpoints, validation, dependency-based authorization |
+| Persistence | MySQL, SQLAlchemy 2 | Customers, catalogue, orders, tickets, conversations, refunds |
+| Migrations | Alembic | Versioned schema changes |
+| Orchestration | LangGraph | Bounded intent routing and agent workflow |
+| Chat model | Groq via `langchain-groq` | Assistant response generation |
+| Retrieval | ChromaDB + Gemini embeddings | Vector search over versioned support policies |
+| Testing | Pytest; Vitest + React Testing Library | Backend and frontend verification |
+| Lint / build | oxlint; Vite | Frontend lint and production bundle |
+ 
+---
+ 
+## Database design
+ 
 ```mermaid
 erDiagram
     CUSTOMERS ||--o{ ORDERS : places
@@ -222,33 +216,42 @@ erDiagram
     CUSTOMERS o|--o{ REFUND_REQUESTS : reviews
     CUSTOMERS o|--o{ SUPPORT_TICKETS : assigned_admin
 ```
-
+ 
 | Table | Description |
-|---|---|
-| `customers` | Customer/admin identity, password hash, role, and active state. |
-| `products` | Product catalogue, category, price, stock, and active state. |
-| `orders` | Customer order status and delivery timestamps. |
-| `order_items` | Product, quantity, and unit price captured for an order. |
-| `support_tickets` | Customer support issues, status, priority, related order, and optional admin assignment. |
-| `ticket_replies` | Messages and authors attached to a support ticket. |
-| `conversations` | Customer-owned persisted conversation records. |
-| `messages` | Conversation messages and optional source metadata. |
-| `refund_requests` | Tracked return/refund requests and admin review outcome; no payment execution. |
-
-## 8. AI design decisions
-
-- **Why multi-agent routing:** product/order operations and policy answers require different data sources and controls. The router selects a bounded workflow, and mixed questions can use both branches.
-- **Why controlled tools instead of raw SQL:** tools validate arguments and call fixed ORM/service operations. The model cannot construct or execute arbitrary SQL.
-- **Why RAG:** policy answers need to cite the versioned policy evidence and abstain when no relevant source is retrieved.
-- **Why MySQL and ChromaDB are separate:** MySQL stores mutable structured application records and relationships; ChromaDB stores searchable policy chunks and embeddings. Each is used for a different query pattern.
-- **How tool authorization works:** FastAPI derives the customer ID from the signed bearer token and supplies it to the graph as trusted context. Customer-specific tool queries filter by that ID; the prompt and model arguments do not set identity.
-- **How out-of-domain requests are blocked:** deterministic routing checks unsupported requests and common instruction-overrides before graph agent selection. The refusal node returns directly without calling tools or retrieval.
-- **Trade-offs:** deterministic intent patterns are fast and testable but need maintenance as phrasing evolves. Similarity thresholds can reject useful evidence or admit weak matches and must be monitored when policies or embeddings change. Groq and Gemini calls require external credentials and availability.
-
-## 9. Project structure
-
-```text
-customer-support-ai/
+| --- | --- |
+| `customers` | Customer/admin identity, password hash, role, active state |
+| `products` | Catalogue entries with category, price, stock, active state |
+| `orders` | Customer orders with status and delivery timestamps |
+| `order_items` | Product, quantity and unit price captured per order |
+| `support_tickets` | Issues with status, priority, related order, optional admin assignee |
+| `ticket_replies` | Messages and authors attached to a ticket |
+| `conversations` | Customer-owned persisted conversation records |
+| `messages` | Conversation messages with optional source metadata |
+| `refund_requests` | Tracked return/refund requests and admin review outcome (no payment execution) |
+ 
+`alembic_version` is maintained by Alembic to record migration state and is not a business entity.
+ 
+---
+ 
+## AI design decisions
+ 
+| Decision | Reasoning |
+| --- | --- |
+| **Multi-agent routing** | Product/order operations and policy answers need different data sources and controls. A router picks a bounded workflow; mixed questions use both branches. |
+| **Controlled tools, not raw SQL** | Tools validate arguments and call fixed ORM/service operations. The model cannot build or run arbitrary SQL. |
+| **RAG for policies** | Policy answers must cite versioned evidence and abstain when nothing relevant is retrieved. |
+| **MySQL and ChromaDB kept separate** | MySQL holds mutable relational records; ChromaDB holds searchable policy chunks and embeddings. Each serves a different query pattern. |
+| **Tool authorization** | FastAPI derives the customer ID from the signed token and passes it to the graph as trusted context. Customer-specific queries filter by that ID; prompts and model arguments cannot set identity. |
+| **Out-of-domain blocking** | Deterministic checks for unsupported requests and instruction overrides run before agent selection, and the refusal node returns directly. |
+ 
+**Trade-offs:** deterministic patterns are fast and testable but need maintenance as phrasing evolves. Similarity thresholds can reject useful evidence or admit weak matches and need monitoring when policies or embeddings change. Groq and Gemini require external credentials and availability.
+ 
+---
+ 
+## Project structure
+ 
+```
+Customer-Support-AI-Multi-Agent/
 ├── backend/
 │   ├── alembic/                 # Versioned database migrations
 │   ├── app/
@@ -257,268 +260,294 @@ customer-support-ai/
 │   │   ├── core/                # Settings, security, rate limits, request IDs, logging
 │   │   ├── models/              # SQLAlchemy entities
 │   │   ├── schemas/             # Pydantic request/response models
-│   │   └── services/            # ORM operations, providers, tools, and retrieval
-│   ├── data/chroma/             # Local Chroma index (generated; do not commit)
+│   │   └── services/            # ORM operations, providers, tools, retrieval
+│   ├── data/chroma/             # Local Chroma index (generated, git-ignored)
 │   ├── knowledge_base/          # Versioned policy Markdown
 │   ├── tests/                   # Pytest suite and evaluation cases
 │   ├── create_tables.py         # Compatibility schema helper
 │   ├── demo.py                  # Authenticated API demonstration
-│   ├── evaluate_assistant.py    # Routing, retrieval, and refusal evaluation
+│   ├── evaluate_assistant.py    # Routing, retrieval and refusal evaluation
 │   ├── index_knowledge.py       # Policy chunking and Chroma ingestion
 │   ├── requirements.txt         # Pinned Python dependencies
 │   └── seed_data.py             # Idempotent demo data seeding
 ├── docs/
 │   └── architecture.md          # Deeper architecture and request flow
 ├── frontend/
-│   ├── public/                  # Static frontend assets
+│   ├── public/                  # Static assets
 │   ├── src/
 │   │   ├── api/                 # Browser-to-FastAPI client functions
-│   │   ├── components/          # Admin, ticket, and refund views
+│   │   ├── components/          # Admin, ticket and refund views
 │   │   ├── App.jsx              # Main routes and customer workspace
-│   │   └── App.test.jsx         # Vitest and Testing Library workflows
-│   ├── package.json             # Frontend scripts and dependencies
-│   └── vite.config.js            # Vite and Vitest configuration
+│   │   └── App.test.jsx         # Vitest + Testing Library workflows
+│   ├── package.json             # Scripts and dependencies
+│   └── vite.config.js           # Vite and Vitest configuration
 ├── .gitignore
-├── LICENSE
 └── README.md
 ```
-
-## 10. Quick start
-
+ 
+### Where things live in the backend
+ 
+| Area | Files | Responsibility |
+| --- | --- | --- |
+| App entry | `backend/app/main.py` | Registers routers, CORS, request-ID middleware, logging |
+| Auth | `api/auth_routes.py`, `core/security.py`, `services/auth_service.py` | Password verification, bearer tokens, current user, admin checks |
+| Controlled tools | `services/agent_tools.py`, `services/tool_agent_service.py` | Validated product/order/ticket/refund operations |
+| Policy retrieval | `services/document_service.py`, `vector_store_service.py`, `rag_service.py` | Load Markdown, embed/index, retrieve, build citations |
+| Providers | `services/provider_service.py` | Groq chat and Gemini embedding clients |
+| Persistence | `models/`, `database.py` | SQLAlchemy models and DB connection |
+ 
+---
+ 
+## Getting started
+ 
 ### Prerequisites
-
-| Tool | Version / requirement |
-|---|---|
-| Python | Python 3.13 was used for the current test run. |
-| Node.js and npm | Node.js 22.16.0 and npm 10.9.2 were used for the current frontend run. |
-| MySQL | A MySQL server and an empty application database; the repository does not specify a minimum server version. |
-| Provider accounts | Groq for generated chat responses; Google AI Studio/Gemini for embeddings and knowledge ingestion. |
-
-The backend tests use isolated SQLite fixtures and do not require the MySQL QA database. Do not point seed or migration commands at a database containing records you need to preserve.
-
-### Windows: backend setup
-
-Open PowerShell:
-
+ 
+| Tool | Requirement |
+| --- | --- |
+| Python | 3.13 (used for the current test run) |
+| Node.js / npm | Node 22.16.0 and npm 10.9.2 were used for the current frontend run |
+| MySQL | A running server and an **empty** application database (no minimum version is specified) |
+| Provider accounts | [Groq](https://console.groq.com/keys) for chat; [Google AI Studio](https://aistudio.google.com/apikey) (Gemini) for embeddings |
+ 
+> ⚠️ Do not point seed or migration commands at a database containing data you need to keep.
+> Backend tests use isolated SQLite fixtures and do not need your MySQL database.
+ 
+### 1. Clone
+ 
+```bash
+git clone https://github.com/arbaaz65dac/Customer-Support-AI-Multi-Agent.git
+cd Customer-Support-AI-Multi-Agent
+```
+ 
+### 2. Backend
+ 
+**Windows (PowerShell)**
+ 
 ```powershell
-cd D:\path\to\customer-support-ai\backend
+cd backend
 py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
-
-Edit `backend\.env`. Set MySQL connection values, a random `JWT_SECRET_KEY` with at least 32 characters, and unique seed passwords of at least 12 characters. Set provider keys for the assistant and knowledge workflows. Create an empty database matching `DB_NAME` before applying migrations. For example, with the MySQL CLI:
-
-```powershell
-mysql -u root -p -e "CREATE DATABASE customer_support_ai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-```
-
-Apply the versioned schema and seed demo data:
-
-```powershell
-python -m alembic upgrade head
-python seed_data.py
-```
-
-To index policy files (requires `GOOGLE_API_KEY`; embedding calls may use provider quota):
-
-```powershell
-python index_knowledge.py
-```
-
-Start the backend from the `backend` directory:
-
-```powershell
-python -m uvicorn app.main:app --reload
-```
-
-### macOS/Linux: backend setup
-
+ 
+**macOS / Linux**
+ 
 ```bash
-cd /path/to/customer-support-ai/backend
+cd backend
 python3.13 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 cp .env.example .env
 ```
-
-Edit `.env` with the same values described above. Create an empty MySQL database, then run:
-
+ 
+Edit `backend/.env`: set the MySQL values, a random `JWT_SECRET_KEY` (32+ characters), unique seed passwords (12+ characters) and your provider keys. See [Environment variables](#environment-variables).
+ 
+Create the empty database:
+ 
+```bash
+mysql -u root -p -e "CREATE DATABASE customer_support_ai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+ 
+Apply migrations and seed demo data:
+ 
 ```bash
 python -m alembic upgrade head
 python seed_data.py
+```
+ 
+Index the policy documents (needs `GOOGLE_API_KEY`; may use embedding quota):
+ 
+```bash
 python index_knowledge.py
+```
+ 
+Start the API:
+ 
+```bash
 python -m uvicorn app.main:app --reload
 ```
-
-`python index_knowledge.py` is only needed for policy retrieval and requires Gemini credentials. Alembic is the canonical schema workflow. `create_tables.py` remains as a compatibility helper; it is not a replacement for Alembic migration history.
-
-### Frontend setup (Windows, macOS, or Linux)
-
-In another terminal:
-
-```text
-cd <repository-root>/frontend
+ 
+> Alembic is the canonical schema workflow. `create_tables.py` is only a compatibility helper, not a replacement for migration history.
+ 
+### 3. Frontend
+ 
+In a second terminal:
+ 
+```bash
+cd frontend
 npm ci
-```
-
-Copy `frontend/.env.example` to `.env` (`Copy-Item .env.example .env` in PowerShell; `cp .env.example .env` on macOS/Linux). Its current `VITE_API_BASE_URL` points to `http://127.0.0.1:8000`. Start Vite:
-
-```text
+cp .env.example .env      # PowerShell: Copy-Item .env.example .env
 npm run dev
 ```
-
-The backend's `FRONTEND_ORIGIN` default is `http://localhost:5173`. If Vite uses another host or port, update `FRONTEND_ORIGIN` and `VITE_API_BASE_URL` to match.
-
-### Verify it works
-
-With the backend running, check health and sign in using a seeded account. Replace the password placeholder with the local value configured in `SEED_CUSTOMER_PASSWORD`; do not commit or share it.
-
-**PowerShell**
-
-```powershell
-Invoke-RestMethod http://127.0.0.1:8000/health
-$body = @{ email = "customer01@example.in"; password = "<local-seed-customer-password>" } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/auth/login -ContentType "application/json" -Body $body
-```
-
-**macOS/Linux**
-
+ 
+`VITE_API_BASE_URL` defaults to `http://127.0.0.1:8000` and the backend's `FRONTEND_ORIGIN` defaults to `http://localhost:5173`. If Vite picks a different host/port, update both values.
+ 
+### 4. Verify
+ 
+With the backend running:
+ 
 ```bash
 curl -i http://127.0.0.1:8000/health
 curl -i -X POST http://127.0.0.1:8000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"customer01@example.in","password":"<local-seed-customer-password>"}'
+  -d '{"email":"customer01@example.in","password":"<your SEED_CUSTOMER_PASSWORD>"}'
 ```
-
-The login response includes an access token and role. API docs are served by FastAPI at `http://127.0.0.1:8000/docs`.
-
-## 11. Environment variables
-
-Copy the checked-in templates; never commit your `.env` files.
-
+ 
+PowerShell equivalent:
+ 
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/health
+$body = @{ email = "customer01@example.in"; password = "<your SEED_CUSTOMER_PASSWORD>" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8000/api/auth/login -ContentType "application/json" -Body $body
+```
+ 
+Interactive API docs: <http://127.0.0.1:8000/docs>
+ 
+---
+ 
+## Deployment (Railway)
+ 
+The live demo at [https://ai-customer-support-production-3b00.up.railway.app/](https://ai-customer-support-production-3b00.up.railway.app/) runs on Railway. If you want to deploy your own copy, the same setup applies:
+ 
+1. Provision a **MySQL** database (Railway's MySQL plugin works) and note its connection details.
+2. Deploy the **backend** (`backend/`) and set the [backend environment variables](#backend-backendenvexample) in the Railway dashboard. Use `DATABASE_URL` or the individual `DB_*` values, and set `JWT_SECRET_KEY`, `GROQ_API_KEY`, `GOOGLE_API_KEY` and the seed passwords.
+3. Run `python -m alembic upgrade head` and `python seed_data.py` against that database.
+4. Run `python index_knowledge.py` to build the policy index. The Chroma index is git-ignored, so it is **not** part of the repository. On Railway, attach a persistent volume for `backend/data/chroma/` or the index is lost on redeploy.
+5. Deploy the **frontend** (`frontend/`) with `VITE_API_BASE_URL` set to your backend's public URL. Vite reads this at build time, so rebuild after changing it.
+6. Set the backend's `FRONTEND_ORIGIN` to the exact public URL of the frontend so CORS allows it.
+> Rate-limit counters are in memory per process, so keep a single backend instance unless you add shared storage.
+ 
+---
+ 
+## Environment variables
+ 
+Copy the checked-in templates and **never commit your `.env` files**.
+ 
 ### Backend (`backend/.env.example`)
-
-| Variable | Required | Description | Placeholder |
-|---|---|---|---|
-| `APP_NAME` | No | API title; defaults to `Customer Support AI Assistant`. | `Customer Support AI Assistant` |
-| `APP_VERSION` | No | API version; defaults to `0.1.0`. | `0.1.0` |
-| `FRONTEND_ORIGIN` | For browser CORS | Allowed frontend origin. | `http://localhost:5173` |
-| `DB_HOST` | Yes, unless using `DATABASE_URL` | MySQL hostname. | `localhost` |
-| `DB_PORT` | Yes, unless using `DATABASE_URL` | MySQL port. | `3306` |
-| `DB_NAME` | Yes, unless using `DATABASE_URL` | Existing application database name. | `customer_support_ai` |
-| `DB_USER` | Yes, unless using `DATABASE_URL` | MySQL user. | `<mysql-user>` |
-| `DB_PASSWORD` | Yes, unless using `DATABASE_URL` | MySQL password. | `<mysql-password>` |
-| `DATABASE_URL` | No | Optional SQLAlchemy URL override, also used by isolated tests. | `mysql+pymysql://<user>:<password>@localhost:3306/customer_support_ai` |
-| `JWT_SECRET_KEY` | For auth | Random signing secret; use at least 32 characters. | `<random-secret-at-least-32-chars>` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Access-token expiry. | `30` |
-| `GROQ_API_KEY` | For LLM answers | Groq credential used by chat generation. | `<groq-api-key>` |
-| `GROQ_MODEL` | No | Groq chat model name. | `llama-3.3-70b-versatile` |
-| `GOOGLE_API_KEY` | For indexing/retrieval | Google credential used by Gemini embeddings. | `<google-api-key>` |
-| `GEMINI_EMBEDDING_MODEL` | No | Gemini embedding model name. | `gemini-embedding-001` |
-| `RAG_TOP_K` | No | Maximum retrieved chunks configured for retrieval. | `3` |
-| `RAG_MAX_DISTANCE` | No | Chroma distance cutoff; lower distance indicates closer match. | `1.5` |
-| `SEED_ADMIN_PASSWORD` | For seed script | Password shared by locally seeded admin accounts; at least 12 characters. | `<unique-local-admin-password>` |
-| `SEED_CUSTOMER_PASSWORD` | For seed script | Password shared by locally seeded customer accounts; at least 12 characters. | `<unique-local-customer-password>` |
-| `AUTH_RATE_LIMIT_MAX_REQUESTS` | No | Login/signup fixed-window request limit per client IP. | `5` |
-| `AUTH_RATE_LIMIT_WINDOW_SECONDS` | No | Login/signup window duration. | `60` |
-| `CHAT_RATE_LIMIT_MAX_REQUESTS` | No | Chat request limit (per user on authenticated graph/tool routes; per IP on unauthenticated chat routes). | `20` |
-| `CHAT_RATE_LIMIT_WINDOW_SECONDS` | No | Chat window duration. | `60` |
-
-Get a Groq key from [GroqCloud](https://console.groq.com/keys) and a Gemini/Google AI key from [Google AI Studio](https://aistudio.google.com/apikey). Provider keys are not included in this repository.
-
+ 
+| Variable | Required | Description | Default / placeholder |
+| --- | --- | --- | --- |
+| `APP_NAME` | No | API title | `Customer Support AI Assistant` |
+| `APP_VERSION` | No | API version | `0.1.0` |
+| `FRONTEND_ORIGIN` | For CORS | Allowed frontend origin | `http://localhost:5173` |
+| `DB_HOST` | Yes\* | MySQL host | `localhost` |
+| `DB_PORT` | Yes\* | MySQL port | `3306` |
+| `DB_NAME` | Yes\* | Existing database name | `customer_support_ai` |
+| `DB_USER` | Yes\* | MySQL user | `<mysql-user>` |
+| `DB_PASSWORD` | Yes\* | MySQL password | `<mysql-password>` |
+| `DATABASE_URL` | No | SQLAlchemy URL override (also used by tests) | `mysql+pymysql://<user>:<password>@localhost:3306/customer_support_ai` |
+| `JWT_SECRET_KEY` | For auth | Random signing secret, 32+ chars | `<random-secret>` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | No | Access-token lifetime | `30` |
+| `GROQ_API_KEY` | For LLM answers | Groq credential | `<groq-api-key>` |
+| `GROQ_MODEL` | No | Groq chat model | `llama-3.3-70b-versatile` |
+| `GOOGLE_API_KEY` | For indexing/retrieval | Gemini embeddings credential | `<google-api-key>` |
+| `GEMINI_EMBEDDING_MODEL` | No | Embedding model | `gemini-embedding-001` |
+| `RAG_TOP_K` | No | Max chunks retrieved | `3` |
+| `RAG_MAX_DISTANCE` | No | Chroma distance cutoff (lower = closer match) | `1.5` |
+| `SEED_ADMIN_PASSWORD` | For seeding | Shared admin seed password, 12+ chars | `<unique-local-admin-password>` |
+| `SEED_CUSTOMER_PASSWORD` | For seeding | Shared customer seed password, 12+ chars | `<unique-local-customer-password>` |
+| `AUTH_RATE_LIMIT_MAX_REQUESTS` | No | Login/signup limit per client IP | `5` |
+| `AUTH_RATE_LIMIT_WINDOW_SECONDS` | No | Login/signup window | `60` |
+| `CHAT_RATE_LIMIT_MAX_REQUESTS` | No | Chat limit (per user on authenticated routes, per IP on public ones) | `20` |
+| `CHAT_RATE_LIMIT_WINDOW_SECONDS` | No | Chat window | `60` |
+ 
+\* Required unless you set `DATABASE_URL`.
+ 
 ### Frontend (`frontend/.env.example`)
-
-| Variable | Required | Description | Placeholder |
-|---|---|---|---|
-| `VITE_API_BASE_URL` | Yes | Base URL for the FastAPI service. | `http://127.0.0.1:8000` |
-
-## 12. Development-only demo accounts
-
-The seed script creates these accounts; they are for local development/demo only:
-
+ 
+| Variable | Required | Description | Default |
+| --- | --- | --- | --- |
+| `VITE_API_BASE_URL` | Yes | Base URL of the FastAPI service | `http://127.0.0.1:8000` |
+ 
+---
+ 
+## Demo accounts
+ 
+Created by `seed_data.py` for **local development only**. There are no hard-coded passwords; they come from your `.env`.
+ 
 | Role | Email | Password |
-|---|---|---|
-| Admin | `admin1@support.local` | Value supplied through `SEED_ADMIN_PASSWORD` |
-| Admin | `admin2@support.local` | Value supplied through `SEED_ADMIN_PASSWORD` |
-| Customer | `customer01@example.in` through `customer12@example.in` | Value supplied through `SEED_CUSTOMER_PASSWORD` |
-
-There are no hard-coded demo passwords. Do not use shared demo accounts in a real deployment.
-
-## 13. API reference
-
-Interactive OpenAPI documentation: [`http://127.0.0.1:8000/docs`](http://127.0.0.1:8000/docs) while the backend is running.
-
-All paths below are relative to the API origin. Authenticated endpoints require `Authorization: Bearer <access-token>`.
-
-### Auth
-
+| --- | --- | --- |
+| Admin | `admin1@support.local`, `admin2@support.local` | `SEED_ADMIN_PASSWORD` |
+| Customer | `customer01@example.in` … `customer12@example.in` | `SEED_CUSTOMER_PASSWORD` |
+ 
+---
+ 
+## API reference
+ 
+Interactive OpenAPI docs are served at `/docs`. Authenticated endpoints need `Authorization: Bearer <access-token>`.
+ 
+<details>
+<summary><b>Auth and customers</b></summary>
 | Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `POST` | `/api/customers` | Public | Register a customer account. |
-| `POST` | `/api/auth/login` | Public | Authenticate and return a bearer token and role. |
-| `GET` | `/api/customers/{customer_id}` | Customer, own profile | Get the authenticated customer's profile. |
-| `GET` | `/api/customers/admin/all` | Admin | List customers/admins. |
-| `GET` | `/api/customers/admin/{customer_id}` | Admin | View a customer profile. |
-| `PATCH` | `/api/customers/admin/{customer_id}/active` | Admin | Activate/deactivate a customer. |
-
-### Products
-
+| --- | --- | --- | --- |
+| `POST` | `/api/customers` | Public | Register a customer |
+| `POST` | `/api/auth/login` | Public | Log in; returns bearer token and role |
+| `GET` | `/api/customers/{customer_id}` | Customer (own) | Get own profile |
+| `GET` | `/api/customers/admin/all` | Admin | List customers/admins |
+| `GET` | `/api/customers/admin/{customer_id}` | Admin | View a customer |
+| `PATCH` | `/api/customers/admin/{customer_id}/active` | Admin | Activate/deactivate a customer |
+ 
+</details>
+<details>
+<summary><b>Products</b></summary>
 | Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `GET` | `/api/products` | Public | Search active products; supports query, category, price bounds, limit, and offset. |
-| `GET` | `/api/products/categories` | Public | List categories with active products. |
-| `GET` | `/api/products/{product_id}` | Public | Get an active product. |
-| `GET` | `/api/products/admin/all` | Admin | List products including inactive records. |
-| `POST` | `/api/products` | Admin | Create a product. |
-| `PATCH` | `/api/products/{product_id}` | Admin | Update product fields. |
-| `DELETE` | `/api/products/{product_id}` | Admin | Deactivate a product while preserving order-item references. |
-
-### Orders
-
+| --- | --- | --- | --- |
+| `GET` | `/api/products` | Public | Search active products (query, category, price bounds, limit, offset) |
+| `GET` | `/api/products/categories` | Public | List categories with active products |
+| `GET` | `/api/products/{product_id}` | Public | Get an active product |
+| `GET` | `/api/products/admin/all` | Admin | List all products including inactive |
+| `POST` | `/api/products` | Admin | Create a product |
+| `PATCH` | `/api/products/{product_id}` | Admin | Update a product |
+| `DELETE` | `/api/products/{product_id}` | Admin | Deactivate a product (keeps order-item references) |
+ 
+</details>
+<details>
+<summary><b>Orders</b></summary>
 | Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `POST` | `/api/orders` | Customer | Create an order for the authenticated customer. |
-| `GET` | `/api/orders` | Customer | List the caller's orders. |
-| `GET` | `/api/orders/{order_id}` | Customer, owner only | Get an owned order and its items. |
-| `GET` | `/api/orders/admin/all` | Admin | List all orders. |
-| `PATCH` | `/api/orders/{order_id}/status` | Admin | Update order status. |
-
-### Tickets
-
+| --- | --- | --- | --- |
+| `POST` | `/api/orders` | Customer | Create an order |
+| `GET` | `/api/orders` | Customer | List own orders |
+| `GET` | `/api/orders/{order_id}` | Customer (owner) | Get an owned order with items |
+| `GET` | `/api/orders/admin/all` | Admin | List all orders |
+| `PATCH` | `/api/orders/{order_id}/status` | Admin | Update order status |
+ 
+</details>
+<details>
+<summary><b>Support tickets</b></summary>
 | Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `POST` | `/api/support-tickets` | Customer | Create a ticket, optionally tied to an owned order. |
-| `GET` | `/api/support-tickets` | Customer | List the caller's tickets. |
-| `GET` | `/api/support-tickets/{ticket_id}` | Customer owner or admin | View ticket details and replies. |
-| `POST` | `/api/support-tickets/{ticket_id}/replies` | Customer owner or admin | Add a ticket reply. |
-| `GET` | `/api/support-tickets/admin/all` | Admin | List/filter tickets by status and priority. |
-| `PATCH` | `/api/support-tickets/{ticket_id}/status` | Admin | Update ticket status. |
-| `PATCH` | `/api/support-tickets/{ticket_id}` | Admin | Update supported ticket fields, including priority/assignment. |
-
-### Chat
-
+| --- | --- | --- | --- |
+| `POST` | `/api/support-tickets` | Customer | Create a ticket (optionally tied to an owned order) |
+| `GET` | `/api/support-tickets` | Customer | List own tickets |
+| `GET` | `/api/support-tickets/{ticket_id}` | Owner or Admin | View ticket and replies |
+| `POST` | `/api/support-tickets/{ticket_id}/replies` | Owner or Admin | Add a reply |
+| `GET` | `/api/support-tickets/admin/all` | Admin | List/filter by status and priority |
+| `PATCH` | `/api/support-tickets/{ticket_id}/status` | Admin | Update status |
+| `PATCH` | `/api/support-tickets/{ticket_id}` | Admin | Update priority/assignment and other fields |
+ 
+</details>
+<details>
+<summary><b>Chat and AI</b></summary>
 | Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `POST` | `/api/support/ask` | Customer | Main LangGraph workflow; returns answer, intent, agent, citations, and product results. |
-| `POST` | `/api/chat/ask` | Public, rate-limited | General LLM response. |
-| `POST` | `/api/chat/structured` | Public, rate-limited | Structured answer, intent, and suggested action. |
-| `POST` | `/api/chat/agent` | Customer | Legacy controlled-tool assistant endpoint. |
-| `POST` | `/api/rag/ask` | Public | Policy retrieval answer with citations. |
-
-Main support request:
-
+| --- | --- | --- | --- |
+| `POST` | `/api/support/ask` | Customer | **Main LangGraph workflow**: answer, intent, agent, citations, products |
+| `POST` | `/api/chat/ask` | Public, rate-limited | General LLM response |
+| `POST` | `/api/chat/structured` | Public, rate-limited | Structured answer, intent, suggested action |
+| `POST` | `/api/chat/agent` | Customer | Legacy controlled-tool assistant |
+| `POST` | `/api/rag/ask` | Public | Policy retrieval answer with citations |
+ 
+Example:
+ 
 ```http
 POST /api/support/ask
 Authorization: Bearer <access-token>
 Content-Type: application/json
-
-{"question":"What is the return window?"}
+ 
+{"question": "What is the return window?"}
 ```
-
-Response shape (illustrative; exact answer, citations, and evidence depend on the indexed policy):
-
+ 
+Illustrative response shape:
+ 
 ```json
 {
   "answer": "<answer grounded in retrieved policy evidence>",
@@ -538,153 +567,152 @@ Response shape (illustrative; exact answer, citations, and evidence depend on th
   "retrieved_chunks": 1
 }
 ```
-
-### Admin and refunds
-
+ 
+</details>
+<details>
+<summary><b>Admin and refunds</b></summary>
 | Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `GET` | `/api/admin/dashboard` | Admin | Customer/order/ticket counts and recorded order-item total. |
-| `GET` | `/api/admin/refund-requests` | Admin | List tracked refund/return requests. |
-| `PATCH` | `/api/admin/refund-requests/{request_id}` | Admin | Approve or reject a pending request; does not execute payment. |
-| `POST` | `/api/refund-requests` | Customer | Create a tracked request for an eligible owned order. |
-| `GET` | `/api/refund-requests` | Customer | List the caller's requests. |
-
-### Conversations
-
+| --- | --- | --- | --- |
+| `GET` | `/api/admin/dashboard` | Admin | Counts and recorded order-item total |
+| `GET` | `/api/admin/refund-requests` | Admin | List refund/return requests |
+| `PATCH` | `/api/admin/refund-requests/{request_id}` | Admin | Approve/reject a pending request (no payment) |
+| `POST` | `/api/refund-requests` | Customer | Create a request for an eligible owned order |
+| `GET` | `/api/refund-requests` | Customer | List own requests |
+ 
+</details>
+<details>
+<summary><b>Conversations</b></summary>
 | Method | Endpoint | Role | Description |
-|---|---|---|---|
-| `POST` | `/api/conversations` | Customer | Create an owned conversation record. |
-| `GET` | `/api/conversations` | Customer | List owned conversation records. |
-| `GET` | `/api/conversations/{conversation_id}` | Customer, owner only | Get one owned conversation and messages. |
-| `POST` | `/api/conversations/{conversation_id}/messages` | Customer, owner only | Append a customer message to an owned conversation. |
-
-Conversation persistence endpoints exist; the current UI does not restore chat history across reloads.
-
-## 14. Testing and evaluation
-
-Run backend tests from `backend/`:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest
-```
-
-macOS/Linux, with the virtual environment activated:
-
+| --- | --- | --- | --- |
+| `POST` | `/api/conversations` | Customer | Create a conversation record |
+| `GET` | `/api/conversations` | Customer | List own conversations |
+| `GET` | `/api/conversations/{conversation_id}` | Customer (owner) | Get a conversation with messages |
+| `POST` | `/api/conversations/{conversation_id}/messages` | Customer (owner) | Append a message |
+ 
+The persistence endpoints exist, but the current UI does not restore chat history across reloads.
+ 
+</details>
+---
+ 
+## Testing and evaluation
+ 
+**Backend** (from `backend/`):
+ 
 ```bash
 python -m pytest
 ```
-
-Run frontend checks from `frontend/`:
-
+ 
+**Frontend** (from `frontend/`):
+ 
 ```bash
 npm test
 npm run lint
 npm run build
 ```
-
-Run the complete assistant evaluation from `backend/`. It requires Gemini credentials and an indexed Chroma collection for retrieval checks:
-
+ 
+**Assistant evaluation** (from `backend/`). The full run needs Gemini credentials and an indexed Chroma collection:
+ 
 ```bash
-python evaluate_assistant.py
+python evaluate_assistant.py                      # routing + retrieval + refusals
+python evaluate_assistant.py --skip-retrieval     # routing and refusals only
 ```
-
-Run routing/refusal checks without retrieval:
-
-```bash
-python evaluate_assistant.py --skip-retrieval
-```
-
-Latest measured results in this environment:
-
+ 
+### Latest measured results
+ 
 | Check | Result |
-|---|---|
-| Backend Pytest | **185 passed**, 1 existing LangChain Community deprecation warning |
+| --- | --- |
+| Backend Pytest | **185 passed** (1 existing LangChain Community deprecation warning) |
 | Frontend Vitest | **7 passed** |
-| Frontend lint | Passed; no warnings reported |
+| Frontend lint | Passed, no warnings |
 | Frontend build | Passed |
-| Routing | **45/45 (100%)** |
-| Expected policy-source retrieval | **12/12 (100%)** |
-| Designated safe refusals | **15/15 (100%)** |
-| Average evaluation-operation latency | **294.06 ms** |
-| Generated response quality / production latency | **Not measured** |
-
-The latency metric is the evaluator's average across measured routing, refusal-graph, and retrieval operations; it is not a user-facing production SLO. Retrieval coverage checks whether expected source filenames were returned for supported evaluation cases.
-
-## 15. Security
-
-- [x] Passwords are stored as password hashes, not plaintext.
-- [x] Signup creates customers; admin role access is enforced by backend dependencies.
-- [x] Customer order, ticket, conversation, and refund lookups are scoped to authenticated identity.
-- [x] Customer-specific tool calls receive trusted backend customer context; model arguments cannot choose another identity.
-- [x] Business tools use validated operations and SQLAlchemy; the LLM is not given arbitrary SQL execution.
-- [x] User content and retrieved policy text are treated as untrusted; common injection/out-of-domain requests short-circuit before tools and RAG.
-- [x] Login/signup and chat routes have configurable in-memory rate limits and return `Retry-After` when limited.
-- [x] API requests receive an `X-Request-ID`; structured logs use allowlisted fields and avoid full message bodies and credentials.
-- [x] CORS origin is configurable; `.env`, virtual environments, `node_modules`, and Chroma data are ignored by Git.
-- [x] Provider errors return safe client-facing messages.
-
-**Token storage:** the frontend currently keeps the bearer token in `sessionStorage`. This is simple and scoped to the browser tab, but JavaScript can read it; an XSS issue could expose the token. For production, an `HttpOnly`, `Secure`, appropriately `SameSite` cookie is recommended, together with CSRF protections and coordinated API/CORS changes. Cookie-based storage has not been implemented.
-
-The current rate limiter is process-local; multiple backend workers/instances do not share counters.
-
-## 16. Limitations and known issues
-
-- This repository has no production deployment URL, demo video, or screenshots yet.
-- This project is a demo foundation, not a production-ready hosted service.
-- Provider-backed chat and policy answers require external Groq/Gemini credentials and network availability.
-- The evaluation measures routing, expected source retrieval, and exact refusal coverage; it does not assess answer quality, user satisfaction, or production performance.
-- The local indexed Chroma data is generated separately and is not included in Git. Policy Q&A requires indexing the versioned documents.
-- The UI does not restore persisted conversations after reload, despite conversation storage APIs being present.
-- There is no refresh-token flow; users sign in again after access-token expiry.
-- Rate-limit counters are in memory and per-process. Distributed deployment needs shared storage for consistent enforcement.
-- Refund/return requests are tracked for review only. The sample return window is read from the versioned policy; no payment is issued.
-- Existing production MySQL databases need a reviewed migration/adoption plan before applying the initial Alembic revision.
-- The backend test run reports an existing `langchain-community` deprecation warning.
-
-## 17. Future improvements
-
-- Add screenshots, a recorded end-to-end demo, and a hosted demo URL.
-- Add shared rate-limit storage for multi-worker deployments.
-- Consider migrating from `sessionStorage` to secure `HttpOnly` cookies with CSRF protections.
-- Add chat-history restoration and a refresh-token/session lifecycle.
-- Add live-provider evaluation for answer correctness, citation faithfulness, and latency under representative load.
-- Add migration adoption guidance and a production database backup/restore procedure.
-- Replace deprecated dependencies where maintained integrations are available.
-- Add deployment observability, load testing, and operational alerts before serving real customers.
-
-## 18. Troubleshooting
-
+| Routing accuracy | **45 / 45 (100%)** |
+| Expected policy-source retrieval | **12 / 12 (100%)** |
+| Designated safe refusals | **15 / 15 (100%)** |
+| Avg. evaluation-operation latency | **294.06 ms** |
+| Generated answer quality / production latency | Not measured |
+ 
+The latency figure is the evaluator's average across routing, refusal-graph and retrieval operations. It is not a production SLO. Retrieval coverage checks that expected source filenames were returned for the evaluation cases.
+ 
+---
+ 
+## Security
+ 
+- ✅ Passwords stored as hashes, never plaintext
+- ✅ Signup creates customers only; admin access is enforced by backend dependencies
+- ✅ Order, ticket, conversation and refund lookups are scoped to the authenticated identity
+- ✅ Customer-specific tool calls receive trusted backend context; model arguments cannot choose another identity
+- ✅ Business tools use validated operations through SQLAlchemy; no arbitrary SQL for the LLM
+- ✅ User content and retrieved policy text are treated as untrusted; injection and out-of-domain requests short-circuit before tools and RAG
+- ✅ Configurable rate limits on login/signup and chat, returning `Retry-After`
+- ✅ `X-Request-ID` on every request; logs use allow-listed fields and avoid message bodies and credentials
+- ✅ Configurable CORS origin; `.env`, virtual environments, `node_modules` and Chroma data are git-ignored
+- ✅ Provider errors return safe client-facing messages
+**Token storage:** the frontend keeps the bearer token in `sessionStorage`, so JavaScript can read it and an XSS bug could expose it. For production, prefer an `HttpOnly`, `Secure`, `SameSite` cookie with CSRF protection. This is not implemented yet.
+ 
+**Rate limiting** is in-memory and per process, so multiple workers do not share counters.
+ 
+---
+ 
+## Limitations
+ 
+- The Railway deployment is a demo, not a production-ready hosted service; production load and uptime have not been measured
+- Chat and policy answers need external Groq/Gemini credentials and network access
+- Evaluation covers routing, expected source retrieval and refusals, not answer quality or production performance
+- The Chroma index is generated separately and is not in Git, so policy Q&A requires running `index_knowledge.py` (and persistent storage when hosted)
+- The UI does not restore persisted conversations after reload
+- No refresh-token flow; users sign in again after the token expires
+- Rate-limit counters are per process
+- Refund/return requests are tracked for review only; no payment is issued
+- Existing production MySQL databases need a reviewed migration plan before applying the initial Alembic revision
+---
+ 
+## Roadmap
+ 
+- [x] Hosted demo on Railway
+- [ ] Shared rate-limit storage for multi-worker deployments
+- [ ] Move from `sessionStorage` to secure `HttpOnly` cookies with CSRF protection
+- [ ] Chat-history restoration and a refresh-token/session lifecycle
+- [ ] Live-provider evaluation of answer correctness, citation faithfulness and latency under load
+- [ ] Migration adoption guide and backup/restore procedure for production databases
+- [ ] Replace deprecated dependencies with maintained integrations
+- [ ] Deployment observability, load testing and alerting
+---
+ 
+## Troubleshooting
+ 
 | Symptom | Likely cause | What to check |
-|---|---|---|
-| MySQL connection refused or access denied | MySQL is stopped, database/user/password is wrong, or the database does not exist. | Check `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, and `DB_PASSWORD`; create an empty database before migration. |
-| Browser reports a CORS error | Browser origin differs from `FRONTEND_ORIGIN`. | Set `FRONTEND_ORIGIN` to the exact Vite origin, restart FastAPI, and verify frontend `VITE_API_BASE_URL`. |
-| Assistant reports provider unavailable | Missing/invalid Groq key, quota, network, or provider issue. | Set `GROQ_API_KEY`; inspect server logs by request ID without logging the key. |
-| Policy questions return no evidence | Chroma index is absent, stale, or pointed at a different backend data directory. | Set `GOOGLE_API_KEY`, run `python index_knowledge.py` from `backend/`, and check `RAG_TOP_K`/`RAG_MAX_DISTANCE`. |
-| Gemini embedding call fails | Missing/invalid Google AI key, model access, or network issue. | Verify `GOOGLE_API_KEY` and `GEMINI_EMBEDDING_MODEL`; then retry ingestion/evaluation. |
-| Port 8000 or 5173 is occupied | Another process is using the development port. | Stop that process or use a free port; if Vite changes ports, update `FRONTEND_ORIGIN` to its actual origin. |
-| Alembic cannot connect or migration fails | Database is unavailable, URL is malformed, or schema state is not the expected initial state. | Confirm database settings and empty target database; inspect Alembic output. Do not run the initial migration blindly against a populated production database. |
-| Login fails after seeding | Seed passwords were unset/too short or login uses the wrong shared seed password. | Set both seed variables to at least 12 characters before running `python seed_data.py`; use the matching role's password at login. |
-
-## 19. Contributing, license, and author
-
-### Contributing
-
+| --- | --- | --- |
+| MySQL connection refused / access denied | Server stopped, wrong credentials, or database missing | Check `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`; create an empty database before migrating |
+| Browser CORS error | Frontend origin differs from `FRONTEND_ORIGIN` | Set `FRONTEND_ORIGIN` to the exact Vite origin, restart FastAPI, verify `VITE_API_BASE_URL` |
+| "Provider unavailable" from the assistant | Missing/invalid Groq key, quota, or network | Set `GROQ_API_KEY`; check server logs by request ID |
+| Policy questions return no evidence | Chroma index missing, stale or in a different directory | Set `GOOGLE_API_KEY`, run `python index_knowledge.py` from `backend/`, review `RAG_TOP_K` / `RAG_MAX_DISTANCE` |
+| Gemini embedding call fails | Invalid key, model access, or network | Verify `GOOGLE_API_KEY` and `GEMINI_EMBEDDING_MODEL`, then retry |
+| Works locally but not on Railway | Wrong `FRONTEND_ORIGIN` or `VITE_API_BASE_URL`, or policy index missing after redeploy | Set `FRONTEND_ORIGIN` to the deployed frontend URL, rebuild the frontend with the correct `VITE_API_BASE_URL`, and re-run `index_knowledge.py` or use a persistent volume |
+| Port 8000 or 5173 in use | Another process is on the port | Stop it or use another port; update `FRONTEND_ORIGIN` if Vite moves |
+| Alembic cannot connect / migration fails | Database down, malformed URL, or unexpected schema state | Confirm settings and an empty target database; never run the initial migration blindly on a populated database |
+| Login fails after seeding | Seed passwords unset/too short, or wrong role's password used | Set both seed variables (12+ chars) before `seed_data.py` and use the matching password |
+ 
+---
+ 
+## Contributing
+ 
 1. Create a branch for your change.
-2. Keep changes scoped and add/update tests for behavior changes.
-3. Run backend tests and frontend test/lint/build commands before opening a pull request.
-4. Never commit `.env` files, API keys, passwords, database dumps, or the Chroma index.
-
-### Author
-
-- **Name:** `Arbaaz Shaikh`
-- **LinkedIn:** `https://www.linkedin.com/in/arbaaz-shaikh-3878a520a/`
-- **GitHub:** `https://github.com/arbaaz65dac`
-- **Email:** `arbaazshaikh8757@gmail.com`
-
-## 20. Needs my verification
-
-- Add the actual application URL and demo video link when available.
-- Add real screenshots at the documented `docs/screenshots/` paths.
-- Replace author placeholders with your public profile/contact details.
-- Confirm MySQL server version and run the first-time setup against your own empty local database; this environment's migration integration test used isolated SQLite.
-- Add project-specific contribution/contact details if you want a different process.
+2. Keep changes focused and add or update tests for behaviour changes.
+3. Run backend tests and the frontend test, lint and build commands before opening a pull request.
+4. Never commit `.env` files, API keys, passwords, database dumps or the Chroma index.
+---
+ 
+## Author
+ 
+**Arbaaz Shaikh**
+ 
+- GitHub: [@arbaaz65dac](https://github.com/arbaaz65dac)
+- LinkedIn: [arbaaz-shaikh](https://www.linkedin.com/in/arbaaz-shaikh-3878a520a/)
+- Email: arbaazshaikh8757@gmail.com
+---
+ 
+<div align="center">
+If you found this project useful, consider giving it a ⭐
+ 
+</div>
+ 
